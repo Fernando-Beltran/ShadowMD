@@ -1,5 +1,7 @@
 # ShadowMD Lite — Web Serial console (Mega / Marcduino)
 
+![ShadowMD Lite web serial console — console + blueprint](2026-03-20-20-06-23.png)
+
 ## What this is — and what it is not
 
 **What it is**
