@@ -1,6 +1,6 @@
 # ShadowMDLite for BetterDuino + AstropixelsPlus
 
-![ShadowMD Lite web serial console — console + blueprint](2026-03-20-20-06-23.png)
+![ShadowMD Lite web serial console (USB + blueprint)](serial-web-console/2026-03-20-20-06-23.png)
 
 `ShadowMDLite` is a cleaned‑up, modernized version of the classic **Shadow MD** sketch for Arduino Mega ADK, designed to be easier to maintain and to work smoothly with **BetterDuino** firmware and **AstropixelsPlus** logic effects.
 
