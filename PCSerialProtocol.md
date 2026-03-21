@@ -47,11 +47,25 @@ Examples:
 - `S3::OP04`
 - `S3::CL00`
 
+### `DT:<LOCAL>`
+
+Optional prefix meaning **handle on the Mega over USB only** — nothing is sent to `Serial1` / `Serial3`. The part after `DT:` must be one of the same **local** forms as without any prefix: `HELP`, `PING`, or `MD:<mdFunc>` (0–89).
+
+Examples:
+
+- `DT:HELP`
+- `DT:PING`
+- `DT:MD:14`
+
+Marcduino-style lines (`*…`, `:…`, `#…`, `@…`, etc.) **cannot** be used after `DT:`; forward those with `S1:` (dome) or `S3:` (body), e.g. `S1:*ON00`.
+
 ### `MD:<mdFunc>`
 
 Calls `marcDuinoButtonPush(1, mdFunc)` with **type = 1** (standard Marcduino function code).
 
 This uses the same `switch (MD_func)` path as the PS3 Nav button map.
+
+**Do not** prefix this with `S1:` or `S3:` — the Mega must receive the line as `MD:14` (etc.) on USB. If a PC tool prepends `S1:`, the payload is forwarded to Serial1 as text and BetterDuino will not run `marcDuinoButtonPush` on the Mega.
 
 Examples:
 
@@ -70,5 +84,5 @@ On valid `HELP` / `PING` / `S1` / `S3` / `MD`, the firmware may print lines such
 
 On bad input (exact text is firmware-defined), for example:
 
-- `ERR formato. Use S1:<COMANDO> o S3:<COMANDO>. Ej: S1::SE01`
+- `ERR formato…` — use `S1:` / `S3:` for Marcduino, or local `HELP` / `PING` / `MD:<n>` / `DT:…`
 - `ERR Missing mdFunc`, `ERR Invalid mdFunc`, `ERR mdFunc out of range (0-89)`, etc.

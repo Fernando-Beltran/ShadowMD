@@ -398,7 +398,8 @@
           <option value="S3:">Body (S3:)</option>
           <option value="S2:">S2:</option>
           <option value="S1:" selected>Dome (S1:)</option>
-          <option value="">No prefix (direct to Mega)</option>
+          <option value="DT:">Local Mega (DT:)</option>
+          <option value="">No prefix (local HELP/PING/MD only)</option>
         </select>
       </div>
     </div>
@@ -603,7 +604,13 @@
         });
         const st = $("serialTarget");
         if (st) {
-          const map = { "S3:": "optTargetS3", "S2:": "optTargetS2", "S1:": "optTargetS1", "": "optTargetNone" };
+          const map = {
+            "S3:": "optTargetS3",
+            "S2:": "optTargetS2",
+            "S1:": "optTargetS1",
+            "DT:": "optTargetDT",
+            "": "optTargetNone",
+          };
           Array.from(st.options).forEach((o) => {
             const k = map[o.value];
             if (k) o.textContent = L(k);
@@ -814,15 +821,21 @@
       /**
        * Prefijo S1:/S2:/S3: para ShadowMD (routing). No duplica si ya lleva S1:/S2:/S3:.
        * Líneas que empiezan por : → prefijo + línea tal cual (S1::OP10, S1::MV011500).
-       * ShadowMD debe retirar el prefijo antes de escribir en el UART del Marcduino.
+       * MD:/HELP/PING se envían tal cual al Mega (USB): el firmware ejecuta marcDuinoButtonPush etc., no reenvío UART.
        */
       function applySerialPrefix(line) {
+        const t = String(line).trim();
+        if (!t) return t;
+        if (/^MD:/i.test(t) || /^HELP$/i.test(t) || /^PING$/i.test(t)) return t;
+
         const prefix = $("serialTarget").value;
-        if (!prefix) return line;
-        const head = line.trimStart();
-        if (/^[sS]\d+:/.test(head)) return line;
-        if (head.startsWith(":")) return prefix + head;
-        return prefix + line;
+        if (!prefix) return t;
+
+        if (/^[sS]\d+:/.test(t)) return t;
+        if (/^[dD][tT]:/.test(t)) return t;
+        if (prefix === "DT:") return prefix + t;
+        if (t.startsWith(":")) return prefix + t;
+        return prefix + t;
       }
 
       function pad4(n) {
@@ -845,8 +858,9 @@
         const lines = raw.split(/\r?\n/);
         try {
           for (const line of lines) {
-            const trimmed = line;
-            if (trimmed.length === 0 && lines.length > 1) continue;
+            const trimmed = line.trim();
+            if (!trimmed.length && lines.length > 1) continue;
+            if (!trimmed.length) continue;
             await sendOneLine(trimmed);
           }
         } catch (e) {
@@ -860,6 +874,7 @@
         const raw = String(line || "").trim();
         if (!raw) return false;
         if (/^md:/i.test(raw)) return true;
+        if (/^HELP$/i.test(raw) || /^PING$/i.test(raw)) return true;
         return /^[:*#@!$%]/.test(raw);
       }
 

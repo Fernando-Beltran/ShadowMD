@@ -108,8 +108,10 @@ int CustomSongMax = 8; //Total Number of Custom Songs
 
 // PC -> MarcDuino forwarding por USB/Serial (opcional).
 // Comandos (una línea por comando):
-//   S1:<COMANDO>  -> reenvía a Serial1
-//   S3:<COMANDO>  -> reenvía a Serial3
+//   S1:<COMANDO>  -> reenvía a Serial1 (dome Marcduino)
+//   S3:<COMANDO>  -> reenvía a Serial3 (body Marcduino)
+//   HELP | PING | MD:<0-89>  -> solo Mega (USB), no reenvío
+//   DT:<lo mismo>  -> explícito “directo al Mega” (HELP/PING/MD); *:#:@: etc. van con S1:/S3:
 // Ejemplo: S1::SE01  (la app/monitor serie puede enviar \n; el firmware añade \r automáticamente)
 #define ENABLE_PC_TO_MARCDUINO_FORWARDING 1
 
@@ -752,6 +754,73 @@ static inline void pcTrimRight(char* s)
   }
 }
 
+static void printPCSerialHelp()
+{
+  Serial.println(F("ShadowMD PC Serial forwarding ON"));
+  Serial.println(F("Marcduino: S1:<cmd> (dome) or S3:<cmd> (body). Ex: S1::SE01"));
+  Serial.println(F("Local Mega: HELP | PING | MD:<0-89> (same as PS3 Marcduino map)"));
+  Serial.println(F("Optional prefix DT: = local only, no Serial1/3. Ex: DT:HELP  DT:MD:14"));
+}
+
+/** HELP / PING / MD: — handled on USB Serial only (not forwarded to Marcduino UARTs). */
+static bool processPCLocalMegaCommand(const char* p)
+{
+  if (!strcmp(p, "HELP") || !strcmp(p, "help"))
+  {
+    printPCSerialHelp();
+    return true;
+  }
+
+  if (!strcmp(p, "PING") || !strcmp(p, "ping"))
+  {
+    Serial.println(F("PONG"));
+    return true;
+  }
+
+  if ((p[0] == 'M' || p[0] == 'm') && (p[1] == 'D' || p[1] == 'd') && p[2] == ':')
+  {
+    const char* payload = p + 3;
+    while (*payload == ' ' || *payload == '\t') payload++;
+    if (*payload == '\0')
+    {
+      Serial.println(F("ERR Missing mdFunc"));
+      return true;
+    }
+
+    char* endPtr = NULL;
+    long mdFunc = strtol(payload, &endPtr, 10);
+    if (endPtr == payload)
+    {
+      Serial.println(F("ERR Invalid mdFunc"));
+      return true;
+    }
+
+    if (mdFunc < 0 || mdFunc > 89)
+    {
+      Serial.println(F("ERR mdFunc out of range (0-89)"));
+      return true;
+    }
+
+    while (*endPtr == ' ' || *endPtr == '\t') endPtr++;
+    if (*endPtr != '\0')
+    {
+      Serial.println(F("ERR Unexpected characters after mdFunc"));
+      return true;
+    }
+
+    while (Serial1.available()) Serial1.read();
+    while (Serial3.available()) Serial3.read();
+
+    marcDuinoButtonPush(1, (int)mdFunc);
+    Serial.print(F("OK marcDuinoButtonPush(1, "));
+    Serial.print(mdFunc);
+    Serial.println(F(")"));
+    return true;
+  }
+
+  return false;
+}
+
 static void processPCSerialLine(const char* line)
 {
   // Make a mutable copy for trimming.
@@ -766,63 +835,26 @@ static void processPCSerialLine(const char* line)
 
   if (*p == '\0') return;
 
-  // Lightweight commands for validation.
-  if (!strcmp(p, "HELP") || !strcmp(p, "help"))
-  {
-    Serial.println(F("ShadowMD PC Serial forwarding ON"));
-    Serial.println(F("Use: S1:<COMANDO> or S3:<COMANDO>"));
-    Serial.println(F("Also: MD:<mdFunc> (calls marcDuinoButtonPush(1, mdFunc))"));
-    Serial.println(F("Example: S1::SE01"));
+  if (processPCLocalMegaCommand(p))
     return;
-  }
 
-  if (!strcmp(p, "PING") || !strcmp(p, "ping"))
+  // DT:<inner> — explicit "direct to Mega" (same local set as above, never forwarded).
+  if ((p[0] == 'D' || p[0] == 'd') && (p[1] == 'T' || p[1] == 't') && p[2] == ':')
   {
-    Serial.println(F("PONG"));
-    return;
-  }
-
-  // High-level command: MD:<mdFunc>
-  if ((p[0] == 'M' || p[0] == 'm') && (p[1] == 'D' || p[1] == 'd') && p[2] == ':')
-  {
-    const char* payload = p + 3;
-    while (*payload == ' ' || *payload == '\t') payload++;
-    if (*payload == '\0')
+    const char* inner = p + 3;
+    while (*inner == ' ' || *inner == '\t') inner++;
+    if (*inner == '\0')
     {
-      Serial.println(F("ERR Missing mdFunc"));
+      Serial.println(F("ERR Empty DT: payload"));
       return;
     }
-
-    char* endPtr = NULL;
-    long mdFunc = strtol(payload, &endPtr, 10);
-    if (endPtr == payload)
-    {
-      Serial.println(F("ERR Invalid mdFunc"));
+    char innerBuf[160];
+    strncpy(innerBuf, inner, sizeof(innerBuf) - 1);
+    innerBuf[sizeof(innerBuf) - 1] = '\0';
+    pcTrimRight(innerBuf);
+    if (processPCLocalMegaCommand(innerBuf))
       return;
-    }
-
-    if (mdFunc < 0 || mdFunc > 89)
-    {
-      Serial.println(F("ERR mdFunc out of range (0-89)"));
-      return;
-    }
-
-    // Allow trailing spaces (already trimmed-right, but be defensive).
-    while (*endPtr == ' ' || *endPtr == '\t') endPtr++;
-    if (*endPtr != '\0')
-    {
-      Serial.println(F("ERR Unexpected characters after mdFunc"));
-      return;
-    }
-
-    // Keep MarcDuino Serial RX buffers clear right before sending actions.
-    while (Serial1.available()) Serial1.read();
-    while (Serial3.available()) Serial3.read();
-
-    marcDuinoButtonPush(1, (int)mdFunc);
-    Serial.print(F("OK marcDuinoButtonPush(1, "));
-    Serial.print(mdFunc);
-    Serial.println(F(")"));
+    Serial.println(F("ERR DT: solo HELP, PING o MD:<0-89>. Marcduino: S1: o S3: (ej. S1:*ON00)"));
     return;
   }
 
@@ -875,7 +907,7 @@ static void processPCSerialLine(const char* line)
     return;
   }
 
-  Serial.println(F("ERR formato. Use S1:<COMANDO> o S3:<COMANDO>. Ej: S1::SE01"));
+  Serial.println(F("ERR formato. Marcduino: S1: o S3:. Mega local: HELP, PING, MD:<n>, DT:... Ej: S1::SE01"));
 }
 
 static void processPCSerial()

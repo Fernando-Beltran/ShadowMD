@@ -19,11 +19,12 @@ window.SHADOWMD_LITE_I18N = {
     optTargetS3: "Body (S3:)",
     optTargetS2: "S2:",
     optTargetS1: "Dome (S1:)",
-    optTargetNone: "No prefix (direct to Mega)",
+    optTargetDT: "Local Mega (DT:)",
+    optTargetNone: "No prefix (local HELP / PING / MD only)",
     serialTargetTitle:
       "ShadowMD: Body→S3, Dome/Holos→S1. E.g. S1::MV011500, S3::OP01 (double : if the command starts with :)",
     routingHint:
-      "ShadowMD: <strong>dome/holos → <code>S1:</code></strong>, <strong>body panels → <code>S3:</code></strong> (plus <code>S2:</code> if you use it). Same <code>:OP</code>/<code>:CL</code>/<code>:MV</code> and <code>#SO</code>/<code>#SC</code> on red and green markers; only the prefix changes. Use <code>::</code> when the payload starts with <code>:</code> (e.g. <code>S1::OP10</code>, <code>S3::MV011500</code>). USB straight to Mega: <em>No prefix</em>.",
+      "<strong><code>MD:&lt;n&gt;</code></strong> (and <code>HELP</code> / <code>PING</code>) always go to the <strong>Mega USB parser</strong> — they call <code>marcDuinoButtonPush</code> on the Mega; the web console does <em>not</em> add <code>S1:</code>/<code>S3:</code> to them even if the destination combo says Dome/Body. Marcduino text (<code>*</code> <code>:</code> <code>#</code> <code>@</code> …) needs <strong><code>S1:</code></strong> (dome) or <strong><code>S3:</code></strong> (body); double <code>::</code> when the payload starts with <code>:</code>. Optional <code>DT:</code> prefix for local-only lines. <code>S2:</code> is not Marcduino on this firmware (Serial2 = motors).",
     chkCr: "End with CR (<code>\\r</code>) — typical Marcduino",
     chkLf: "Also send LF (<code>\\n</code>)",
     labelCmd: "Command (one or more lines; each Send transmits the block)",
@@ -99,11 +100,12 @@ window.SHADOWMD_LITE_I18N = {
     optTargetS3: "Body (S3:)",
     optTargetS2: "S2:",
     optTargetS1: "Dome (S1:)",
-    optTargetNone: "Sin prefijo (directo al Mega)",
+    optTargetDT: "Mega local (DT:)",
+    optTargetNone: "Sin prefijo (solo HELP / PING / MD)",
     serialTargetTitle:
       "ShadowMD: Body→S3, Dome/Holos→S1. Ej. S1::MV011500, S3::OP01 (doble : si el comando empieza por :)",
     routingHint:
-      "ShadowMD: <strong>domo/holos → <code>S1:</code></strong>, <strong>body paneles → <code>S3:</code></strong> (más <code>S2:</code> si lo usas). Mismos comandos <code>:OP</code>/<code>:CL</code>/<code>:MV</code> y <code>#SO</code>/<code>#SC</code> en rojo y verde; solo cambia el prefijo. Doble <code>::</code> si el comando empieza por <code>:</code> (ej. <code>S1::OP10</code>, <code>S3::MV011500</code>). USB directo al Mega: <em>Sin prefijo</em>.",
+      "<strong><code>MD:&lt;n&gt;</code></strong> (y <code>HELP</code> / <code>PING</code>) van siempre al <strong>parser USB del Mega</strong> — ejecutan <code>marcDuinoButtonPush</code> en el Mega; la consola <em>no</em> antepone <code>S1:</code>/<code>S3:</code> aunque el combo diga Domo/Body. Texto Marcduino (<code>*</code> <code>:</code> <code>#</code> <code>@</code> …) lleva <strong><code>S1:</code></strong> o <strong><code>S3:</code></strong>; doble <code>::</code> si empieza por <code>:</code>. Prefijo opcional <code>DT:</code> para líneas solo locales. <code>S2:</code> no es Marcduino en este firmware (Serial2 = motores).",
     chkCr: "Terminar con CR (<code>\\r</code>) — típico Marcduino",
     chkLf: "Añadir también LF (<code>\\n</code>)",
     labelCmd: "Comando (una o varias líneas; cada «Enviar» manda el bloque)",
