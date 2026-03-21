@@ -1,0 +1,166 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ShadowMDFinal — Acciones de botones y comandos Serial</title>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Segoe+UI&display=swap');
+    * { box-sizing: border-box; }
+    body {
+      font-family: 'Segoe UI', system-ui, sans-serif;
+      font-size: 10px;
+      line-height: 1.25;
+      color: #222;
+      max-width: 100%;
+      margin: 0;
+      padding: 12px;
+    }
+    h1 {
+      font-size: 14px;
+      margin: 0 0 6px 0;
+      border-bottom: 2px solid #333;
+      padding-bottom: 4px;
+    }
+    .intro {
+      font-size: 9px;
+      margin-bottom: 10px;
+      color: #444;
+    }
+    .no-print {
+      font-size: 11px;
+      margin-bottom: 10px;
+      padding: 8px;
+      background: #f0f0f0;
+      border-radius: 4px;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      table-layout: fixed;
+      font-size: 8px;
+    }
+    th, td {
+      border: 1px solid #333;
+      padding: 4px 5px;
+      text-align: left;
+      vertical-align: top;
+    }
+    th {
+      background: #333;
+      color: #fff;
+      font-weight: 600;
+    }
+    tr:nth-child(even) { background: #f8f8f8; }
+    .col-id   { width: 4%; }
+    .col-mando { width: 12%; }
+    .col-combo { width: 18%; }
+    .col-md   { width: 5%; text-align: center; }
+    .col-serial { width: 35%; font-family: Consolas, monospace; font-size: 7px; word-break: break-all; }
+    .col-significado { width: 26%; font-size: 7px; }
+    code { font-family: Consolas, monospace; background: #eee; padding: 0 2px; font-size: 7px; }
+    @media print {
+      body { padding: 0; font-size: 9px; }
+      .no-print { display: none !important; }
+      table { font-size: 7px; }
+      .col-serial, .col-significado { font-size: 6px; }
+      th, td { padding: 3px 4px; }
+      h1 { font-size: 12px; }
+      .intro { font-size: 8px; }
+    }
+  </style>
+</head>
+<body>
+  <div class="no-print">
+    <strong>Para guardar como PDF:</strong> Archivo → Imprimir (o Ctrl+P) → Destino: <em>Guardar como PDF</em> → Guardar.
+  </div>
+  <h1>ShadowMDFinal — Acciones de botones y comandos Serial</h1>
+  <p class="intro">Tabla de todas las combinaciones de botones (mandos Foot y Dome), el código MarcDuino (MD) que ejecutan y los comandos enviados por Serial1/Serial3. Cuando intervienen dos mandos, se indica explícitamente qué botón es de cada uno (ej. Dome LEFT + Foot CROSS).</p>
+  <table>
+    <thead>
+      <tr>
+        <th class="col-id">ID</th>
+        <th class="col-mando">Mando</th>
+        <th class="col-combo">Combinación de botones</th>
+        <th class="col-md">MD</th>
+        <th class="col-serial">Serial que envía</th>
+        <th class="col-significado">Significado MD (comentario del código)</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr><td>1</td><td>Foot</td><td>Foot UP</td><td>2</td><td>Serial1: <code>:SE01\r</code></td><td>2 = Scream - all panels open</td></tr>
+      <tr><td>2</td><td>Foot</td><td>Foot DOWN</td><td>11</td><td>Serial1: <code>@0T1\r</code>, luego <code>:SE10\r</code></td><td>11 = Quiet mode reset (panel close, stop holos, stop sounds)</td></tr>
+      <tr><td>3</td><td>Foot</td><td>Foot LEFT</td><td>13</td><td>Serial1: <code>:SE13\r</code></td><td>13 = Mid Awake mode reset</td></tr>
+      <tr><td>4</td><td>Foot</td><td>Foot RIGHT</td><td>14</td><td>Serial1: <code>:SE14\r</code></td><td>14 = Full Awake+ reset</td></tr>
+      <tr><td>5</td><td>Dome</td><td>Dome UP</td><td>82</td><td>Serial3: <code>:SE31\r</code></td><td>82 = Eebel Open all Body Doors, raise arms, operate tools...</td></tr>
+      <tr><td>6</td><td>Dome</td><td>Dome DOWN</td><td>56</td><td>Serial3: <code>:OP01\r</code>, delay(550), <code>:ST01\r</code> o <code>:CL01\r</code> (según DPLOpen)</td><td>56 = Open Body Panel #1 — toggle Data Panel Door</td></tr>
+      <tr><td>7</td><td>Dome</td><td>Dome LEFT</td><td>84</td><td>Serial3: <code>:SE34\r</code></td><td>84 = Eebel Use Interface Tool</td></tr>
+      <tr><td>8</td><td>Dome</td><td>Dome RIGHT</td><td>83</td><td>Serial3: <code>:SE33\r</code></td><td>83 = Eebel Use Gripper</td></tr>
+      <tr><td>9</td><td>Foot</td><td>Foot UP + Foot CROSS</td><td>26</td><td>Serial1: <code>$+\r</code></td><td>26 = Volume Up</td></tr>
+      <tr><td>10</td><td>Foot+Dome</td><td>Foot UP + Dome CROSS</td><td>26</td><td>Serial1: <code>$+\r</code></td><td>26 = Volume Up</td></tr>
+      <tr><td>11</td><td>Foot</td><td>Foot LEFT + Foot CROSS</td><td>23</td><td>Serial1: si HoloOn==false → <code>*HPF0013\r</code>; si true → <code>*HPF0000\r</code></td><td>23 = Holo Lights On (All) — toggle On/Off</td></tr>
+      <tr><td>12</td><td>Foot+Dome</td><td>Foot LEFT + Dome CROSS</td><td>23</td><td>Serial1: si HoloOn==false → <code>*HPF0013\r</code>; si true → <code>*HPF0000\r</code></td><td>23 = Holo Lights On (All) — toggle On/Off</td></tr>
+      <tr><td>13</td><td>Foot</td><td>Foot RIGHT + Foot CROSS</td><td>24</td><td>Serial1: si HoloOn2==false → <code>*HPR0013\r</code>; si true → <code>*HPR0000\r</code></td><td>24 = Holo Lights Off (All) — toggle secundarias</td></tr>
+      <tr><td>14</td><td>Foot+Dome</td><td>Foot RIGHT + Dome CROSS</td><td>24</td><td>Serial1: si HoloOn2==false → <code>*HPR0013\r</code>; si true → <code>*HPR0000\r</code></td><td>24 = Holo Lights Off (All) — toggle secundarias</td></tr>
+      <tr><td>15</td><td>Foot</td><td>Foot DOWN + Foot CROSS</td><td>27</td><td>Serial1: <code>$-\r</code></td><td>27 = Volume Down</td></tr>
+      <tr><td>16</td><td>Foot+Dome</td><td>Foot DOWN + Dome CROSS</td><td>27</td><td>Serial1: <code>$-\r</code></td><td>27 = Volume Down</td></tr>
+      <tr><td>17</td><td>Dome+Foot</td><td>Dome UP + Foot CROSS</td><td>7</td><td>Serial3: <code>:OP02\r</code>, <code>:OP03\r</code>, delay(750), <code>:ST00\r</code> o <code>:CL02\r</code>, <code>:CL03\r</code>, delay(950), <code>:ST00\r</code></td><td>7 = Faint / Short Circuit (toggle Utility Arms)</td></tr>
+      <tr><td>18</td><td>Dome+Foot</td><td>Dome LEFT + Foot CROSS</td><td>30</td><td>Serial3: <code>:OP04\r</code>, <code>:OP07\r</code>; Serial1: <code>@1T3\r</code>; delay(550); Serial1: <code>:ST00\r</code>; Serial3: <code>:ST00\r</code></td><td>30 = Open All Dome Panels (abre puertas cuerpo + efecto)</td></tr>
+      <tr><td>19</td><td>Dome+Foot</td><td>Dome RIGHT + Foot CROSS</td><td>33</td><td>Serial1: <code>:CL00\r</code>; Serial3: <code>:CL00\r</code></td><td>33 = Close All Dome Panels (+ Body)</td></tr>
+      <tr><td>20</td><td>Dome+Foot</td><td>Dome DOWN + Foot CROSS</td><td>79</td><td>Serial3: <code>:CL00\r</code> (secuencia gripper comentada en código)</td><td>79 = Eebel Spook Wave Dome and body</td></tr>
+      <tr><td>21</td><td>Foot</td><td>Foot UP + Foot CIRCLE</td><td>16</td><td>Serial1: <code>:SE52\r</code></td><td>16 = Wave, one panel at a time (NO SOUND)</td></tr>
+      <tr><td>22</td><td>Foot+Dome</td><td>Foot UP + Dome CIRCLE</td><td>16</td><td>Serial1: <code>:SE52\r</code></td><td>16 = Wave, one panel at a time (NO SOUND)</td></tr>
+      <tr><td>23</td><td>Foot</td><td>Foot LEFT + Foot CIRCLE</td><td>17</td><td>Serial1: <code>:SE53\r</code></td><td>17 = Fast (smirk) back and forth (NO SOUND)</td></tr>
+      <tr><td>24</td><td>Foot+Dome</td><td>Foot LEFT + Dome CIRCLE</td><td>17</td><td>Serial1: <code>:SE53\r</code></td><td>17 = Fast (smirk) back and forth (NO SOUND)</td></tr>
+      <tr><td>25</td><td>Foot</td><td>Foot RIGHT + Foot CIRCLE</td><td>19</td><td>Serial1: <code>:SE55\r</code></td><td>19 = Marching Ants (NO SOUND)</td></tr>
+      <tr><td>26</td><td>Foot+Dome</td><td>Foot RIGHT + Dome CIRCLE</td><td>19</td><td>Serial1: <code>:SE55\r</code></td><td>19 = Marching Ants (NO SOUND)</td></tr>
+      <tr><td>27</td><td>Foot</td><td>Foot DOWN + Foot CIRCLE</td><td>21</td><td>Serial1: <code>:SE57\r</code></td><td>21 = Rhythmic cantina dance (NO SOUND)</td></tr>
+      <tr><td>28</td><td>Foot+Dome</td><td>Foot DOWN + Dome CIRCLE</td><td>21</td><td>Serial1: <code>:SE57\r</code></td><td>21 = Rhythmic cantina dance (NO SOUND)</td></tr>
+      <tr><td>29</td><td>Dome+Foot</td><td>Dome UP + Foot CIRCLE</td><td>8</td><td>Serial1: <code>:SE07\r</code></td><td>8 = Cantina Dance - orchestral, rhythmic panel dance</td></tr>
+      <tr><td>30</td><td>Dome+Foot</td><td>Dome LEFT + Foot CIRCLE</td><td>10</td><td>Serial1: <code>*HPS601\r</code></td><td>10 = Disco</td></tr>
+      <tr><td>31</td><td>Dome+Foot</td><td>Dome RIGHT + Foot CIRCLE</td><td>86</td><td>Serial1: <code>@0T3\r</code>; delay(5000); luego <code>@0T1\r</code></td><td>86 = Eebel Star Wars Disco Dance</td></tr>
+      <tr><td>32</td><td>Dome+Foot</td><td>Dome DOWN + Foot CIRCLE</td><td>87</td><td>Serial1: <code>@0T3\r</code>; delay(5000); luego <code>@0T1\r</code></td><td>87 = Eebel Star Trek Disco Dance</td></tr>
+      <tr><td>33</td><td>Foot</td><td>Foot UP + Foot L1</td><td>9</td><td>Serial1: <code>*HPR0013\r</code>, <code>:SE08\r</code></td><td>9 = Leia message</td></tr>
+      <tr><td>34</td><td>Foot</td><td>Foot LEFT + Foot L1</td><td>3</td><td>Serial1: <code>:SE02\r</code>; Serial3: <code>:SE02\r</code></td><td>3 = Wave, One Panel at a time (dome+body)</td></tr>
+      <tr><td>35</td><td>Foot</td><td>Foot RIGHT + Foot L1</td><td>5</td><td>Serial1: <code>:SE04\r</code></td><td>5 = Wave 2, Open progressively all panels, then close one by one</td></tr>
+      <tr><td>36</td><td>Foot</td><td>Foot DOWN + Foot L1</td><td>0</td><td>—</td><td>0 = FREE</td></tr>
+      <tr><td>37</td><td>Dome</td><td>Dome UP + Dome L1</td><td>4</td><td>Serial1: <code>:SE03\r</code></td><td>4 = Fast (smirk) back and forth wave</td></tr>
+      <tr><td>38</td><td>Dome</td><td>Dome LEFT + Dome L1</td><td>83</td><td>Serial3: <code>:SE33\r</code></td><td>83 = Eebel Use Gripper</td></tr>
+      <tr><td>39</td><td>Dome</td><td>Dome RIGHT + Dome L1</td><td>84</td><td>Serial3: <code>:SE34\r</code></td><td>84 = Eebel Use Interface Tool</td></tr>
+      <tr><td>40</td><td>Dome</td><td>Dome DOWN + Dome L1</td><td>18</td><td>Serial1: <code>:SE54\r</code></td><td>18 = Wave 2 (NO SOUND)</td></tr>
+      <tr><td>41</td><td>Foot</td><td>Foot UP + Foot PS</td><td>30</td><td>Serial3: <code>:OP04\r</code>, <code>:OP07\r</code>; Serial1: <code>@1T3\r</code>; delay(550); Serial1: <code>:ST00\r</code>; Serial3: <code>:ST00\r</code></td><td>30 = Open All Dome Panels (abre puertas cuerpo + efecto)</td></tr>
+      <tr><td>42</td><td>Foot+Dome</td><td>Foot UP + Dome PS</td><td>30</td><td>Serial3: <code>:OP04\r</code>, <code>:OP07\r</code>; Serial1: <code>@1T3\r</code>; delay(550); Serial1: <code>:ST00\r</code>; Serial3: <code>:ST00\r</code></td><td>30 = Open All Dome Panels (abre puertas cuerpo + efecto)</td></tr>
+      <tr><td>43</td><td>Foot</td><td>Foot LEFT + Foot PS</td><td>89</td><td>Serial1: MakeSongCommand(CurrentSongNum) (decrementado; si &lt;1 → CustomSongMax)</td><td>89 = Eebel Play Previous Song</td></tr>
+      <tr><td>44</td><td>Foot+Dome</td><td>Foot LEFT + Dome PS</td><td>89</td><td>Serial1: MakeSongCommand(CurrentSongNum) (decrementado; si &lt;1 → CustomSongMax)</td><td>89 = Eebel Play Previous Song</td></tr>
+      <tr><td>45</td><td>Foot</td><td>Foot RIGHT + Foot PS</td><td>88</td><td>Serial1: MakeSongCommand(CurrentSongNum) (incrementado; si &gt;CustomSongMax → 0 y play 1)</td><td>88 = Eebel Play Next Song</td></tr>
+      <tr><td>46</td><td>Foot+Dome</td><td>Foot RIGHT + Dome PS</td><td>88</td><td>Serial1: MakeSongCommand(CurrentSongNum) (incrementado; si &gt;CustomSongMax → 0 y play 1)</td><td>88 = Eebel Play Next Song</td></tr>
+      <tr><td>47</td><td>Foot</td><td>Foot DOWN + Foot PS</td><td>33</td><td>Serial1: <code>:CL00\r</code>; Serial3: <code>:CL00\r</code></td><td>33 = Close All Dome Panels (+ Body)</td></tr>
+      <tr><td>48</td><td>Foot+Dome</td><td>Foot DOWN + Dome PS</td><td>33</td><td>Serial1: <code>:CL00\r</code>; Serial3: <code>:CL00\r</code></td><td>33 = Close All Dome Panels (+ Body)</td></tr>
+      <tr><td>49</td><td>Dome+Foot</td><td>Dome UP + Foot PS</td><td>81</td><td>Serial3: <code>:SE30\r</code></td><td>81 = Eebel Utility Arms Open and then Close</td></tr>
+      <tr><td>50</td><td>Dome+Foot</td><td>Dome LEFT + Foot PS</td><td>58</td><td>Serial3: <code>:OP02\r</code>, delay(750), <code>:ST02\r</code> o <code>:CL02\r</code> (según TopUArmOpen)</td><td>58 = Open Body Panel #2 — Top Utility Arm Toggle</td></tr>
+      <tr><td>51</td><td>Dome+Foot</td><td>Dome RIGHT + Foot PS</td><td>60</td><td>Serial3: <code>:OP03\r</code>, delay(750), <code>:ST03\r</code> o <code>:CL03\r</code> (según BotUArmOpen)</td><td>60 = Open Body Panel #3 — Bottom Utility Arm Toggle</td></tr>
+      <tr><td>52</td><td>Dome+Foot</td><td>Dome DOWN + Foot PS</td><td>85</td><td>Serial3: <code>:SE35\r</code></td><td>85 = Eebel Ping Pong Body Doors</td></tr>
+      <tr><td>53</td><td>Foot+Dome</td><td>Foot UP + Dome L3</td><td>0</td><td>—</td><td>0 = FREE (cross-controller)</td></tr>
+      <tr><td>54</td><td>Foot+Dome</td><td>Foot DOWN + Dome L3</td><td>0</td><td>—</td><td>0 = FREE (cross-controller)</td></tr>
+      <tr><td>55</td><td>Foot+Dome</td><td>Foot LEFT + Dome L3</td><td>0</td><td>—</td><td>0 = FREE (cross-controller)</td></tr>
+      <tr><td>56</td><td>Foot+Dome</td><td>Foot RIGHT + Dome L3</td><td>0</td><td>—</td><td>0 = FREE (cross-controller)</td></tr>
+      <tr><td>57</td><td>Dome+Foot</td><td>Dome UP + Foot L3</td><td>0</td><td>—</td><td>0 = FREE (cross-controller)</td></tr>
+      <tr><td>58</td><td>Dome+Foot</td><td>Dome DOWN + Foot L3</td><td>0</td><td>—</td><td>0 = FREE (cross-controller)</td></tr>
+      <tr><td>59</td><td>Dome+Foot</td><td>Dome LEFT + Foot L3</td><td>0</td><td>—</td><td>0 = FREE (cross-controller)</td></tr>
+      <tr><td>60</td><td>Dome+Foot</td><td>Dome RIGHT + Foot L3</td><td>0</td><td>—</td><td>0 = FREE (cross-controller)</td></tr>
+      <tr><td>61</td><td>Dome</td><td>Dome UP + L2</td><td>0</td><td>—</td><td>0 = FREE</td></tr>
+      <tr><td>62</td><td>Dome</td><td>Dome DOWN + L2</td><td>0</td><td>—</td><td>0 = FREE</td></tr>
+      <tr><td>63</td><td>Dome</td><td>Dome LEFT + L2</td><td>0</td><td>—</td><td>0 = FREE</td></tr>
+      <tr><td>64</td><td>Dome</td><td>Dome RIGHT + L2</td><td>0</td><td>—</td><td>0 = FREE</td></tr>
+      <tr><td>65</td><td>Dome+Foot</td><td>Dome UP + L2 + Foot CROSS</td><td>0</td><td>—</td><td>0 = FREE</td></tr>
+      <tr><td>66</td><td>Dome+Foot</td><td>Dome DOWN + L2 + Foot CROSS</td><td>0</td><td>—</td><td>0 = FREE</td></tr>
+      <tr><td>67</td><td>Dome+Foot</td><td>Dome LEFT + L2 + Foot CROSS</td><td>0</td><td>—</td><td>0 = FREE</td></tr>
+      <tr><td>68</td><td>Dome+Foot</td><td>Dome RIGHT + L2 + Foot CROSS</td><td>0</td><td>—</td><td>0 = FREE</td></tr>
+      <tr><td>69</td><td>Dome+Foot</td><td>Dome UP + L2 + Foot CIRCLE</td><td>0</td><td>—</td><td>0 = FREE</td></tr>
+      <tr><td>70</td><td>Dome+Foot</td><td>Dome DOWN + L2 + Foot CIRCLE</td><td>0</td><td>—</td><td>0 = FREE</td></tr>
+      <tr><td>71</td><td>Dome+Foot</td><td>Dome LEFT + L2 + Foot CIRCLE</td><td>0</td><td>—</td><td>0 = FREE</td></tr>
+      <tr><td>72</td><td>Dome+Foot</td><td>Dome RIGHT + L2 + Foot CIRCLE</td><td>0</td><td>—</td><td>0 = FREE</td></tr>
+    </tbody>
+  </table>
+</body>
+</html>

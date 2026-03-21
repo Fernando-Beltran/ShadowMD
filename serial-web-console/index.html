@@ -1,0 +1,1222 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>ShadowMD Lite — Serial console (USB)</title>
+  <style>
+    :root {
+      --bg: #0f1419;
+      --panel: #1a2332;
+      --text: #e6edf3;
+      --muted: #8b949e;
+      --accent: #58a6ff;
+      --ok: #3fb950;
+      --warn: #d29922;
+      --err: #f85149;
+      --border: #30363d;
+    }
+    * { box-sizing: border-box; }
+    html, body {
+      height: 100%;
+      margin: 0;
+    }
+    body {
+      font-family: "Segoe UI", system-ui, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      padding: 0.75rem 1.25rem 1rem;
+      line-height: 1.45;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+    .page-header {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 1rem 1.25rem;
+      margin-bottom: 0.5rem;
+      flex-shrink: 0;
+    }
+    .page-header img {
+      height: 48px;
+      width: auto;
+      max-width: 100%;
+      object-fit: contain;
+      display: block;
+    }
+    /* SVG incrustado: evita fallos al abrir index.html como archivo (file://) */
+    .logo-shadowmd {
+      height: 48px;
+      width: auto;
+      max-width: 100%;
+      display: block;
+      flex-shrink: 0;
+    }
+    .logo-group {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 0.75rem 1rem;
+    }
+    .logo-sep {
+      width: 1px;
+      height: 40px;
+      background: var(--border);
+      flex-shrink: 0;
+    }
+    .page-header .titles { flex: 1; min-width: 12rem; }
+    .lang-row {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      margin-top: 0.5rem;
+      flex-wrap: wrap;
+    }
+    .lang-row label { font-size: 0.8rem; color: var(--muted); margin: 0; }
+    .lang-row select {
+      background: var(--bg);
+      color: var(--text);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 0.35rem 0.5rem;
+      font-size: 0.85rem;
+    }
+    h1 { font-size: 1.25rem; margin: 0 0 0.25rem; font-weight: 600; }
+    .tagline {
+      margin: 0;
+      font-size: 0.8rem;
+      font-weight: 500;
+      color: var(--accent);
+      letter-spacing: 0.02em;
+    }
+    .sub { color: var(--muted); font-size: 0.875rem; margin: 0 0 0.65rem; flex-shrink: 0; }
+    /* Dos columnas: izq. consola + conexión · der. blueprint / calibración */
+    .app-main {
+      flex: 1;
+      min-height: 0;
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) minmax(0, 2fr);
+      gap: 1rem;
+      align-items: stretch;
+    }
+    @media (max-width: 1100px) {
+      .app-main {
+        grid-template-columns: 1fr;
+        overflow-y: auto;
+        align-content: start;
+      }
+      body { overflow: auto; height: auto; min-height: 100%; }
+    }
+    .col-console,
+    .col-config {
+      min-height: 0;
+      overflow-y: auto;
+      overflow-x: hidden;
+      display: flex;
+      flex-direction: column;
+      gap: 1rem;
+      padding-right: 2px; /* evita recorte del scrollbar */
+    }
+    .col-title {
+      font-size: 0.7rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      color: var(--muted);
+      margin: 0;
+      flex-shrink: 0;
+    }
+    .panel {
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 1rem 1.25rem;
+      margin-bottom: 0;
+      flex-shrink: 0;
+    }
+    .panel-console {
+      flex: 1;
+      min-height: 0;
+      display: flex;
+      flex-direction: column;
+    }
+    .panel-console > label[for="cmd"] { flex-shrink: 0; }
+    .panel-console textarea#cmd {
+      flex-shrink: 0;
+      min-height: 4.5rem;
+      max-height: 28vh;
+    }
+    .console-log-block {
+      flex: 1;
+      min-height: 8rem;
+      display: flex;
+      flex-direction: column;
+      margin-top: 0.5rem;
+    }
+    .console-log-block > strong { flex-shrink: 0; }
+    .row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.75rem;
+      align-items: center;
+      margin-bottom: 0.75rem;
+    }
+    .row:last-child { margin-bottom: 0; }
+    label { color: var(--muted); font-size: 0.8rem; }
+    select, input[type="number"], textarea {
+      background: var(--bg);
+      color: var(--text);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 0.45rem 0.6rem;
+      font-size: 0.95rem;
+    }
+    textarea {
+      width: 100%;
+      min-height: 5rem;
+      font-family: ui-monospace, "Cascadia Code", Consolas, monospace;
+      resize: vertical;
+    }
+    button {
+      cursor: pointer;
+      border: none;
+      border-radius: 6px;
+      padding: 0.5rem 1rem;
+      font-size: 0.9rem;
+      font-weight: 600;
+    }
+    button:disabled { opacity: 0.45; cursor: not-allowed; }
+    .btn-primary { background: var(--accent); color: #fff; }
+    .btn-ok { background: var(--ok); color: #0d1117; }
+    .btn-warn { background: var(--warn); color: #0d1117; }
+    .btn-ghost {
+      background: transparent;
+      color: var(--text);
+      border: 1px solid var(--border);
+    }
+    .checks { display: flex; flex-wrap: wrap; gap: 1rem; align-items: center; }
+    .checks label { display: flex; align-items: center; gap: 0.35rem; color: var(--text); font-size: 0.9rem; }
+    #status {
+      font-size: 0.85rem;
+      padding: 0.5rem 0.75rem;
+      border-radius: 6px;
+      background: var(--bg);
+      border: 1px solid var(--border);
+    }
+    #status.connected { border-color: var(--ok); color: var(--ok); }
+    #status.error { border-color: var(--err); color: var(--err); }
+    #log {
+      font-family: ui-monospace, Consolas, monospace;
+      font-size: 0.8rem;
+      white-space: pre-wrap;
+      word-break: break-all;
+      flex: 1;
+      min-height: 6rem;
+      overflow-y: auto;
+      background: #0d1117;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 0.75rem;
+      margin-top: 0.35rem;
+    }
+    .hint { font-size: 0.8rem; color: var(--muted); margin-top: 0.75rem; }
+    code { background: #21262d; padding: 0.1rem 0.35rem; border-radius: 4px; }
+    .blueprint-panel { flex: 1; min-height: 0; display: flex; flex-direction: column; }
+    .blueprint-panel > .blueprint-layout { flex: 1; min-height: 0; }
+    .blueprint-panel h2 {
+      font-size: 1.05rem;
+      margin: 0 0 0.5rem;
+      font-weight: 600;
+    }
+    .blueprint-layout {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 1rem;
+      align-items: start;
+    }
+    @media (min-width: 520px) {
+      .blueprint-layout { grid-template-columns: minmax(0, 1.1fr) minmax(240px, 340px); }
+    }
+    .blueprint-stage {
+      position: relative;
+      width: 75%;
+      max-width: 100%;
+      margin: 0 auto;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      overflow: hidden;
+      background: #0d1117;
+    }
+    .blueprint-stage img {
+      width: 100%;
+      height: auto;
+      display: block;
+      vertical-align: top;
+    }
+    .hotspots {
+      position: absolute;
+      left: 0;
+      top: 0;
+      width: 100%;
+      height: 100%;
+      pointer-events: none;
+    }
+    .hotspot {
+      position: absolute;
+      pointer-events: auto;
+      border: 2px solid rgba(88, 166, 255, 0.55);
+      background: rgba(88, 166, 255, 0.12);
+      border-radius: 6px;
+      cursor: pointer;
+      transition: border-color 0.15s, background 0.15s, box-shadow 0.15s;
+    }
+    .hotspot:hover {
+      border-color: rgba(88, 166, 255, 0.95);
+      background: rgba(88, 166, 255, 0.22);
+      box-shadow: 0 0 0 1px rgba(88, 166, 255, 0.4);
+    }
+    .hotspot.selected {
+      border-color: var(--ok);
+      background: rgba(63, 185, 80, 0.2);
+      box-shadow: 0 0 0 2px rgba(63, 185, 80, 0.35);
+    }
+    .hotspot .hotspot-label {
+      position: absolute;
+      left: 50%;
+      bottom: 100%;
+      transform: translate(-50%, -4px);
+      font-size: 0.65rem;
+      font-weight: 600;
+      color: var(--text);
+      background: rgba(22, 27, 34, 0.92);
+      padding: 2px 6px;
+      border-radius: 4px;
+      white-space: nowrap;
+      border: 1px solid var(--border);
+      opacity: 0;
+      transition: opacity 0.15s;
+      pointer-events: none;
+    }
+    .hotspot:hover .hotspot-label,
+    .hotspot.selected .hotspot-label { opacity: 1; }
+    .blueprint-controls label { display: block; margin-top: 0.65rem; margin-bottom: 0.25rem; }
+    .blueprint-controls input[type="range"] {
+      width: 100%;
+      accent-color: var(--accent);
+    }
+    .pwm-inline { display: inline-flex; align-items: center; gap: 0.35rem; flex-wrap: wrap; }
+    .pwm-inline input[type="number"] { width: 4.5rem; }
+    .zone-nav { display: flex; gap: 0.5rem; margin-top: 0.5rem; flex-wrap: wrap; }
+    .zone-nav button { flex: 1; min-width: 7rem; }
+    .slider-val { color: var(--accent); font-family: ui-monospace, monospace; font-size: 0.85rem; }
+    .blueprint-actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.5rem;
+      margin-top: 0.75rem;
+      align-items: center;
+    }
+    .blueprint-actions .btn-row-label {
+      width: 100%;
+      font-size: 0.75rem;
+      color: var(--muted);
+      margin: 0;
+      font-weight: 600;
+    }
+    .blueprint-actions button { flex: 1; min-width: 7.5rem; }
+    .wrap-slider-v.is-hidden,
+    label.wrap-slider-v.is-hidden { display: none !important; }
+    select:disabled { opacity: 0.5; cursor: not-allowed; }
+  </style>
+</head>
+<body>
+  <header class="page-header">
+    <div class="logo-group">
+      <svg class="logo-shadowmd" xmlns="http://www.w3.org/2000/svg" width="300" height="60" viewBox="0 0 300 60" role="img" aria-label="ShadowMD Lite — R2-D2">
+        <defs>
+          <linearGradient id="smdBlueH" x1="0%" y1="0%" x2="100%" y2="100%">
+            <stop offset="0%" stop-color="#79b8ff"/>
+            <stop offset="100%" stop-color="#388bfd"/>
+          </linearGradient>
+        </defs>
+        <rect x="3" y="8" width="46" height="44" rx="8" fill="#161b22" stroke="#30363d" stroke-width="1.25"/>
+        <rect x="11" y="20" width="30" height="10" rx="2" fill="url(#smdBlueH)" opacity="0.95"/>
+        <circle cx="17" cy="40" r="3.5" fill="#da3633"/>
+        <circle cx="26" cy="40" r="3.5" fill="#d29922"/>
+        <circle cx="35" cy="40" r="3.5" fill="#3fb950"/>
+        <rect x="11" y="46" width="30" height="4" rx="1" fill="#30363d"/>
+        <text x="58" y="32" fill="#e6edf3" font-family="Segoe UI,system-ui,sans-serif" font-size="19" font-weight="700">ShadowMD</text>
+        <text x="58" y="48" fill="#8b949e" font-family="Segoe UI,system-ui,sans-serif" font-size="10.5" font-weight="400">R2-D2 &#183; USB serial</text>
+        <rect x="226" y="11" width="68" height="28" rx="6" fill="#58a6ff" fill-opacity="0.14" stroke="#58a6ff" stroke-width="1.25"/>
+        <text x="260" y="29" fill="#58a6ff" font-family="Segoe UI,system-ui,sans-serif" font-size="13" font-weight="700" text-anchor="middle">LITE</text>
+      </svg>
+      <span class="logo-sep" aria-hidden="true"></span>
+      <img src="logo.png" width="347" height="60" alt="Astromech" />
+    </div>
+    <div class="titles">
+      <h1 data-i18n="h1Title">Serial console (USB)</h1>
+      <p class="tagline">ShadowMD Lite · astromech R2-D2</p>
+      <div class="lang-row">
+        <label for="uiLang" data-i18n="langLabel">Language</label>
+        <select id="uiLang" aria-label="Interface language">
+          <option value="en">English</option>
+          <option value="es">Español</option>
+        </select>
+      </div>
+    </div>
+  </header>
+  <p class="sub" data-i18n-html="subIntro"></p>
+
+  <div class="app-main">
+    <div class="col-console">
+      <p class="col-title" data-i18n="colConsole">Console & connection</p>
+  <div class="panel">
+    <div class="row">
+      <div>
+        <label for="baud" data-i18n="labelBaud">Baud rate</label><br />
+        <select id="baud">
+          <option selected>9600</option>
+          <option>19200</option>
+          <option>38400</option>
+          <option>57600</option>
+          <option>115200</option>
+        </select>
+      </div>
+      <button type="button" class="btn-ok" id="btnConnect" data-i18n="btnConnect">Connect port…</button>
+      <button type="button" class="btn-warn" id="btnDisconnect" disabled data-i18n="btnDisconnect">Disconnect</button>
+    </div>
+    <div id="status" data-i18n="statusDisconnected">Not connected.</div>
+  </div>
+
+  <div class="panel panel-console">
+    <div class="row" style="align-items: flex-end;">
+      <div>
+        <label for="serialTarget" data-i18n="labelSerialTarget">Destination (ShadowMD)</label><br />
+        <select id="serialTarget" data-i18n-title="serialTargetTitle">
+          <option value="S3:">Body (S3:)</option>
+          <option value="S2:">S2:</option>
+          <option value="S1:" selected>Dome (S1:)</option>
+          <option value="">No prefix (direct to Mega)</option>
+        </select>
+      </div>
+    </div>
+    <p class="hint" style="margin-top: 0; margin-bottom: 0.75rem;" data-i18n-html="routingHint"></p>
+    <div class="checks row">
+      <label><input type="checkbox" id="cr" checked /> <span data-i18n-html="chkCr"></span></label>
+      <label><input type="checkbox" id="lf" /> <span data-i18n-html="chkLf"></span></label>
+    </div>
+    <label for="cmd" data-i18n="labelCmd">Command (one or more lines; each Send transmits the block)</label>
+    <textarea id="cmd" data-i18n-placeholder="cmdPlaceholder" placeholder="*ON00&#10;@0T1&#10;"></textarea>
+    <div class="row" style="margin-top: 0.75rem;">
+      <button type="button" class="btn-primary" id="btnSend" disabled data-i18n="btnSend">Send</button>
+      <button type="button" class="btn-ghost" id="btnClearLog" data-i18n="btnClearLog">Clear log</button>
+    </div>
+    <div class="console-log-block">
+      <strong style="font-size: 0.85rem; color: var(--muted);" data-i18n="receivedLabel">Received</strong>
+      <div id="log"></div>
+    </div>
+  </div>
+    </div>
+
+    <div class="col-config">
+      <p class="col-title" data-i18n="colConfig">Configuration · blueprint</p>
+  <div class="panel blueprint-panel">
+    <h2 data-i18n="h2Blueprint">R2-D2 blueprint · image-based calibration</h2>
+    <div class="blueprint-layout">
+      <div class="blueprint-stage" id="blueprintStage">
+        <img
+          src="r2d2plans.png"
+          alt=""
+          data-i18n-alt="blueprintAlt"
+          id="blueprintImg"
+          width="736"
+          referrerpolicy="no-referrer"
+          loading="lazy"
+          onerror="this.onerror=null;this.src='https://i.pinimg.com/736x/3a/e4/e9/3ae4e912e7e105efa20555f5736e9c3d.jpg';"
+        />
+        <div class="hotspots" id="hotspots" aria-hidden="true"></div>
+      </div>
+      <div class="blueprint-controls">
+        <label for="zoneSelect" data-i18n="labelZoneSelect">Active zone</label>
+        <select id="zoneSelect"></select>
+        <div class="zone-nav">
+          <button type="button" class="btn-ghost" id="zonePrev" data-i18n="zonePrev">◀ Previous</button>
+          <button type="button" class="btn-ghost" id="zoneNext" data-i18n="zoneNext">Next ▶</button>
+        </div>
+        <div class="row" style="margin-top: 0.25rem; align-items: flex-end; gap: 0.75rem;">
+          <span class="hint" id="holoLiveHint" style="flex: 1; margin: 0; display: none;" data-i18n-title="holoLiveTitle" data-i18n-html="holoLiveHint"></span>
+          <button type="button" class="btn-ok need-serial" id="btnSaveOpen" disabled data-i18n-title="titleSaveMax">
+            Save MAX
+          </button>
+          <button type="button" class="btn-warn need-serial" id="btnSaveClosed" disabled data-i18n-title="titleSaveMin">
+            Save MIN
+          </button>
+          <label for="holoSaveAxis" style="margin: 0;" data-i18n="labelHolo">Holo</label>
+          <select id="holoSaveAxis" class="need-serial" data-i18n-title="titleHoloSaveAxis">
+            <option value="hv" selected>H+V</option>
+            <option value="h">H only</option>
+            <option value="v">V only</option>
+          </select>
+        </div>
+        <label class="pwm-inline"><span data-i18n="pwmMinLabel">PWM min.</span> <input type="number" id="pwmMin" value="800" min="0" max="4095" step="1" /> <span data-i18n="pwmMaxLabel">max.</span> <input type="number" id="pwmMax" value="2200" min="0" max="4095" step="1" /></label>
+        <label id="labelSliderH"><span id="labelSliderHPref">PWM servo</span> — <span class="slider-val" id="valH">1500</span></label>
+        <input type="range" id="sliderH" class="need-serial" min="500" max="2500" value="1500" disabled />
+        <div class="wrap-slider-v" id="wrapSliderV">
+        <label><span data-i18n="labelSliderVPrefix">Vertical servo (V)</span> — <span class="slider-val" id="valV">1500</span></label>
+        <input type="range" id="sliderV" class="need-serial" min="500" max="2500" value="1500" disabled />
+        </div>
+        <label style="margin-top: 0.75rem;"><input type="checkbox" id="autoSend" checked /> <span data-i18n="chkAutoSend">Send automatically when moving the slider</span></label>
+        <div class="row" style="margin-top: 0.75rem;">
+          <button type="button" class="btn-primary need-serial" id="btnSendPos" disabled data-i18n="btnSend">Send</button>
+        </div>
+        <div class="blueprint-actions">
+          <span class="btn-row-label" data-i18n="quickActionsLabel">Quick actions (active zone)</span>
+          <button type="button" class="btn-ok need-serial" id="btnPanelOpen" disabled data-i18n="btnOpenPanel">
+            Open panel
+          </button>
+          <button type="button" class="btn-warn need-serial" id="btnPanelClose" disabled data-i18n="btnClosePanel">
+            Close panel
+          </button>
+          <button type="button" class="btn-ghost need-serial" id="btnCenterServos" disabled data-i18n="btnCenter">
+            Center
+          </button>
+          <button type="button" class="btn-ghost need-serial" id="btnCenterAllHolos" disabled data-i18n="btnCenterAllHolos">
+            Center all (*CH00)
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+    </div>
+  </div>
+
+  <script src="i18n.js"></script>
+  <script>
+    /**
+     * ShadowMD: body → prefijo S3:, dome/holos → S1: (ver combo serialTarget / inferSerialTargetFromZone).
+     * Servos panel (b* body + s* dome): mismos comandos Marcduino :MV/:OP/:CL y #SO/#SC (xx = mdPanel). Solo cambia el prefijo serie (body S3:, dome S1:).
+     * Holo: *MHxxdddd/*MVxxdddd; EEPROM #HO/#HC (H máx/mín), #VO/#VC (V máx/mín); *CHxx centrar (BetterDuino).
+     */
+    const R2_BLUEPRINT_ZONES = [
+      // Markers aligned with the reference blueprint image.
+      { id: "s0", label: "Panel 4 (Lower Panel)", labelEs: "Panel 4 (panel inferior)", kind: "servo", servoIndex: 0, mdPanel: "04", target: "S1:", map: { left: 95.19, top: 26.94, w: 3.2, h: 3.2 } },
+      { id: "s1", label: "Panel 3 (Lower Panel)", labelEs: "Panel 3 (panel inferior)", kind: "servo", servoIndex: 1, mdPanel: "03", target: "S1:", map: { left: 94.6, top: 31.6, w: 3.2, h: 3.2 } },
+      { id: "s2", label: "Panel 2 (Lower Panel)", labelEs: "Panel 2 (panel inferior)", kind: "servo", servoIndex: 2, mdPanel: "02", target: "S1:", map: { left: 91.7, top: 35.7, w: 3.2, h: 3.2 } },
+      { id: "s3", label: "Panel 1 (Lower Panel)", labelEs: "Panel 1 (panel inferior)", kind: "servo", servoIndex: 3, mdPanel: "01", target: "S1:", map: { left: 88.37, top: 38.94, w: 3.2, h: 3.2 } },
+      { id: "s4", label: "Panel 5 (Lower Panel)", labelEs: "Panel 5 (panel inferior)", kind: "servo", servoIndex: 4, mdPanel: "05", target: "S1:", map: { left: 53.83, top: 36.56, w: 3.2, h: 3.2 } },
+      { id: "s5", label: "Panel 6 (Lower Panel)", labelEs: "Panel 6 (panel inferior)", kind: "servo", servoIndex: 5, mdPanel: "06", target: "S1:", map: { left: 49.65, top: 29.77, w: 3.2, h: 3.2 } },
+      // Upper: diagram number ≠ Marcduino; mdPanel is the real command index.
+      { id: "s8", label: "Panel 10 (Upper Panel)", labelEs: "Panel 10 (panel superior)", kind: "servo", servoIndex: 8, mdPanel: "07", target: "S1:", map: { left: 61.77, top: 23.09, w: 3.2, h: 3.2 } },
+      { id: "s9", label: "Panel 9 (Upper Panel)", labelEs: "Panel 9 (panel superior)", kind: "servo", servoIndex: 9, mdPanel: "08", target: "S1:", map: { left: 65.95, top: 30.22, w: 3.2, h: 3.2 } },
+      { id: "s10", label: "Panel 8 (Upper Panel)", labelEs: "Panel 8 (panel superior)", kind: "servo", servoIndex: 10, mdPanel: "09", target: "S1:", map: { left: 77.37, top: 30.33, w: 3.2, h: 3.2 } },
+      { id: "s11", label: "Panel 7 (Upper Panel)", labelEs: "Panel 7 (panel superior)", kind: "servo", servoIndex: 11, mdPanel: "10", target: "S1:", map: { left: 82.24, top: 24.45, w: 3.2, h: 3.2 } },
+      { id: "s12", label: "Circular Top Panel", labelEs: "Panel circular superior", kind: "servo", servoIndex: 12, mdPanel: "11", target: "S1:" },
+      // Body (S3:) — mdPanel for :MV/:OP/:CL/#SO/#SC (body servo 1→01 … 9→09).
+      { id: "b1", label: "Body 1 · DPL - DataPanel Door", labelEs: "Body 1 · DPL - Puerta datapanel", kind: "servo", servoIndex: 1, mdPanel: "01", target: "S3:", map: { left: 40.32, top: 61.46, w: 3.2, h: 3.2 } },
+      { id: "b2", label: "Body 2 · UtlArmU - Upper Utility Arm", labelEs: "Body 2 · UtlArmU - Brazo útil superior", kind: "servo", servoIndex: 2, mdPanel: "02", target: "S3:", map: { left: 32.24, top: 46.18, w: 3.2, h: 3.2 } },
+      { id: "b3", label: "Body 3 · UtlArmL - Lower Utility Arm", labelEs: "Body 3 · UtlArmL - Brazo útil inferior", kind: "servo", servoIndex: 3, mdPanel: "03", target: "S3:", map: { left: 27.93, top: 51.04, w: 3.2, h: 3.2 } },
+      { id: "b4", label: "Body 4 · LBdyDr - Left BreadPan Door", labelEs: "Body 4 · LBdyDr - Puerta izquierda", kind: "servo", servoIndex: 4, mdPanel: "04", target: "S3:", map: { left: 15.53, top: 58.74, w: 3.2, h: 3.2 } },
+      { id: "b5", label: "Body 5 · LArm - Left Arm Raise/Lower", labelEs: "Body 5 · LArm - Brazo izq. subir/bajar", kind: "servo", servoIndex: 5, mdPanel: "05", target: "S3:", map: { left: 15.81, top: 53.87, w: 3.2, h: 3.2 } },
+      { id: "b6", label: "Body 6 · LArmTool - Left Arm Tool", labelEs: "Body 6 · LArmTool - Herramienta brazo izq.", kind: "servo", servoIndex: 6, mdPanel: "06", target: "S3:", map: { left: 15.95, top: 49.01, w: 3.2, h: 3.2 } },
+      { id: "b7", label: "Body 7 · ToolRBdyDr - Right BreadPan Door", labelEs: "Body 7 · ToolRBdyDr - Puerta derecha", kind: "servo", servoIndex: 7, mdPanel: "07", target: "S3:", map: { left: 46.45, top: 59.76, w: 3.2, h: 3.2 } },
+      { id: "b8", label: "Body 8 · RArm - Right Arm Raise/Lower", labelEs: "Body 8 · RArm - Brazo dcho. subir/bajar", kind: "servo", servoIndex: 8, mdPanel: "08", target: "S3:", map: { left: 46.59, top: 55.12, w: 3.2, h: 3.2 } },
+      { id: "b9", label: "Body 9 · RArmTool - Right Arm Tool", labelEs: "Body 9 · RArmTool - Herramienta brazo dcho.", kind: "servo", servoIndex: 9, mdPanel: "09", target: "S3:", map: { left: 47.15, top: 48.89, w: 3.2, h: 3.2 } },
+      { id: "holo_f", label: "Front Holo", labelEs: "Holo frontal", kind: "holo", holoId: "01", target: "S1:", maps: [
+        { left: 82.1, top: 43.7, w: 3.2, h: 3.2 },
+        { left: 81.4, top: 37.3, w: 3.2, h: 3.2 },
+      ] },
+      { id: "holo_r", label: "Rear Holo", labelEs: "Holo trasero", kind: "holo", holoId: "03", target: "S1:", maps: [
+        { left: 71.3, top: 7.0, w: 3.2, h: 3.2 },
+        { left: 65.53, top: 4.19, w: 3.2, h: 3.2 },
+      ] },
+      { id: "holo_t", label: "Top Holo", labelEs: "Holo superior", kind: "holo", holoId: "02", target: "S1:", maps: [
+        { left: 81.96, top: 14.60, w: 3.2, h: 3.2 },
+        { left: 75.14, top: 14.60, w: 3.2, h: 3.2 },
+      ] },
+    ];
+
+    (function () {
+      const LANG_KEY = "shadowmd-lite-ui-lang";
+      const STR =
+        window.SHADOWMD_LITE_I18N &&
+        window.SHADOWMD_LITE_I18N.en &&
+        window.SHADOWMD_LITE_I18N.es
+          ? window.SHADOWMD_LITE_I18N
+          : { en: {}, es: {} };
+      let uiLang = localStorage.getItem(LANG_KEY) === "es" ? "es" : "en";
+
+      const $ = (id) => document.getElementById(id);
+      const logEl = $("log");
+      const statusEl = $("status");
+
+      function L(key, vars) {
+        let s = (STR[uiLang] && STR[uiLang][key]) || (STR.en && STR.en[key]) || key;
+        if (vars && typeof vars === "object") {
+          Object.keys(vars).forEach((k) => {
+            s = s.split("{" + k + "}").join(String(vars[k]));
+          });
+        }
+        return s;
+      }
+
+      function zoneDisplayLabel(z) {
+        if (!z) return "";
+        return uiLang === "es" && z.labelEs ? z.labelEs : z.label;
+      }
+
+      let port = null;
+      let writer = null;
+      let reader = null;
+      let readLoopAbort = false;
+      let selectedZoneIndex = 0;
+      let autoSendTimer = null;
+      let serialConnected = false;
+
+      function applyUiLanguage() {
+        document.documentElement.lang = uiLang === "es" ? "es" : "en";
+        document.title = L("docTitle");
+        document.querySelectorAll("[data-i18n]").forEach((el) => {
+          const key = el.getAttribute("data-i18n");
+          if (key) el.textContent = L(key);
+        });
+        document.querySelectorAll("[data-i18n-html]").forEach((el) => {
+          const key = el.getAttribute("data-i18n-html");
+          if (key) el.innerHTML = L(key);
+        });
+        document.querySelectorAll("[data-i18n-placeholder]").forEach((el) => {
+          const key = el.getAttribute("data-i18n-placeholder");
+          if (key) el.placeholder = L(key);
+        });
+        document.querySelectorAll("[data-i18n-title]").forEach((el) => {
+          const key = el.getAttribute("data-i18n-title");
+          if (key) el.title = L(key);
+        });
+        document.querySelectorAll("[data-i18n-alt]").forEach((el) => {
+          const key = el.getAttribute("data-i18n-alt");
+          if (key) el.alt = L(key);
+        });
+        const st = $("serialTarget");
+        if (st) {
+          const map = { "S3:": "optTargetS3", "S2:": "optTargetS2", "S1:": "optTargetS1", "": "optTargetNone" };
+          Array.from(st.options).forEach((o) => {
+            const k = map[o.value];
+            if (k) o.textContent = L(k);
+          });
+          st.title = L("serialTargetTitle");
+        }
+        const holoAx = $("holoSaveAxis");
+        if (holoAx) {
+          const amap = { hv: "optHoloHV", h: "optHoloH", v: "optHoloV" };
+          Array.from(holoAx.options).forEach((o) => {
+            const k = amap[o.value];
+            if (k) o.textContent = L(k);
+          });
+          holoAx.title = L("titleHoloSaveAxis");
+        }
+        fillZoneSelect();
+        renderHotspots();
+        selectZone(selectedZoneIndex);
+        const langSel = $("uiLang");
+        if (langSel) langSel.value = uiLang;
+        const bo = $("btnPanelOpen");
+        const bc = $("btnPanelClose");
+        const bce = $("btnCenterServos");
+        const ball = $("btnCenterAllHolos");
+        if (bo) bo.title = L("titleOpenPanelBtn");
+        if (bc) bc.title = L("titleClosePanelBtn");
+        if (bce) bce.title = L("titleCenterServoBtn");
+        if (ball) ball.title = L("titleCenterAllHolosBtn");
+        const bso = $("btnSaveOpen");
+        const bsc = $("btnSaveClosed");
+        if (bso) bso.title = L("titleSaveMax");
+        if (bsc) bsc.title = L("titleSaveMin");
+        refreshStatusText();
+        updateZoneUi();
+      }
+
+      function refreshStatusText() {
+        if (!serialConnected) {
+          statusEl.textContent = L("statusDisconnected");
+        } else {
+          const baud = parseInt($("baud").value, 10) || 115200;
+          statusEl.textContent = L("statusConnected", { baud });
+        }
+      }
+
+      applyUiLanguage();
+
+      if (!("serial" in navigator)) {
+        statusEl.textContent = L("webSerialUnsupported");
+        statusEl.classList.add("error");
+        return;
+      }
+
+      function setConnected(connected) {
+        serialConnected = connected;
+        $("btnConnect").disabled = connected;
+        $("btnDisconnect").disabled = !connected;
+        $("btnSend").disabled = !connected;
+        document.querySelectorAll(".need-serial").forEach((el) => {
+          el.disabled = !connected;
+        });
+        updateZoneUi();
+        statusEl.classList.toggle("connected", connected);
+        statusEl.classList.remove("error");
+        if (!connected) {
+          refreshStatusText();
+          statusEl.classList.remove("connected");
+        }
+      }
+
+      function getCurrentZone() {
+        return R2_BLUEPRINT_ZONES[selectedZoneIndex] || null;
+      }
+
+      function getZoneMaps(zone) {
+        if (!zone) return [];
+        if (Array.isArray(zone.maps) && zone.maps.length) return zone.maps;
+        if (zone.map) return [zone.map];
+        return [];
+      }
+
+      function inferSerialTargetFromZone(zone) {
+        if (!zone) return null;
+        // Body (b*) -> S3 ; Dome/Holos -> S1 (ShadowMD en tu cableado)
+        if (String(zone.id || "").startsWith("b")) return "S3:";
+        return "S1:";
+      }
+
+      function updateZoneUi() {
+        const z = getCurrentZone();
+        const isHolo = z && z.kind === "holo";
+        const servoPanel = z && z.kind === "servo";
+        const wrap = $("wrapSliderV");
+        if (wrap) wrap.classList.toggle("is-hidden", !isHolo);
+        const pref = $("labelSliderHPref");
+        if (pref) pref.textContent = isHolo ? L("servoHorizontalH") : L("pwmServo");
+        if (isHolo) {
+          $("btnSendPos").textContent = L("sendPosHolo");
+        } else if (servoPanel) {
+          $("btnSendPos").textContent = L("sendPosPanel", { panel: getMdPanel2(z) });
+        } else {
+          $("btnSendPos").textContent = L("sendGeneric");
+        }
+        if (isHolo) $("btnCenterServos").textContent = L("centerHoloBtn");
+        else if (servoPanel) $("btnCenterServos").textContent = L("centerPwmBtn");
+        else $("btnCenterServos").textContent = L("centerGenericBtn");
+        const allHolosBtn = $("btnCenterAllHolos");
+        if (allHolosBtn) allHolosBtn.disabled = !serialConnected;
+        const holoHint = $("holoLiveHint");
+        if (holoHint) holoHint.style.display = isHolo ? "block" : "none";
+        $("holoSaveAxis").disabled = !serialConnected || !isHolo;
+        const zoneSaveOk = serialConnected && !!z;
+        $("btnSaveOpen").disabled = !zoneSaveOk;
+        $("btnSaveClosed").disabled = !zoneSaveOk;
+        const openCloseOk = serialConnected && servoPanel;
+        const openBtn = $("btnPanelOpen");
+        const closeBtn = $("btnPanelClose");
+        const p2 = servoPanel ? getMdPanel2(z) : "";
+        if (openBtn) {
+          openBtn.disabled = !openCloseOk;
+          openBtn.title = servoPanel ? L("titleOpenCmd", { panel: p2 }) : L("titlePickServo");
+        }
+        if (closeBtn) {
+          closeBtn.disabled = !openCloseOk;
+          closeBtn.title = servoPanel ? L("titleCloseCmd", { panel: p2 }) : L("titlePickServo");
+        }
+      }
+
+      function appendLog(prefix, text) {
+        const line = "[" + new Date().toLocaleTimeString() + "] " + prefix + text + "\n";
+        logEl.textContent += line;
+        logEl.scrollTop = logEl.scrollHeight;
+      }
+
+      async function startReadLoop() {
+        readLoopAbort = false;
+        const decoder = new TextDecoder();
+        if (!port || !port.readable) return;
+        reader = port.readable.getReader();
+        try {
+          while (!readLoopAbort) {
+            const { value, done } = await reader.read();
+            if (done) break;
+            if (value && value.length) {
+              appendLog("← ", decoder.decode(value, { stream: true }));
+            }
+          }
+        } catch (e) {
+          if (!readLoopAbort) appendLog("! ", L("logReadErr") + (e.message || e));
+        } finally {
+          try {
+            reader.releaseLock();
+          } catch (_) {}
+          reader = null;
+        }
+      }
+
+      async function openPort() {
+        try {
+          port = await navigator.serial.requestPort();
+          const baud = parseInt($("baud").value, 10) || 115200;
+          await port.open({ baudRate: baud });
+
+          const enc = new TextEncoderStream();
+          enc.readable.pipeTo(port.writable).catch(() => {});
+          writer = enc.writable.getWriter();
+
+          statusEl.textContent = L("statusConnected", { baud });
+          setConnected(true);
+          startReadLoop();
+        } catch (e) {
+          if (e.name === "NotFoundError") return;
+          statusEl.textContent = "Error: " + (e.message || e);
+          statusEl.classList.add("error");
+          port = null;
+          writer = null;
+          setConnected(false);
+        }
+      }
+
+      async function closePort() {
+        readLoopAbort = true;
+        try {
+          if (reader) {
+            await reader.cancel();
+          }
+        } catch (_) {}
+        try {
+          if (writer) {
+            await writer.close();
+          }
+        } catch (_) {}
+        writer = null;
+        try {
+          if (port) await port.close();
+        } catch (_) {}
+        port = null;
+        setConnected(false);
+      }
+
+      function lineEnding() {
+        let end = "";
+        if ($("cr").checked) end += "\r";
+        if ($("lf").checked) end += "\n";
+        return end;
+      }
+
+      /**
+       * Prefijo S1:/S2:/S3: para ShadowMD (routing). No duplica si ya lleva S1:/S2:/S3:.
+       * Líneas que empiezan por : → prefijo + línea tal cual (S1::OP10, S1::MV011500).
+       * ShadowMD debe retirar el prefijo antes de escribir en el UART del Marcduino.
+       */
+      function applySerialPrefix(line) {
+        const prefix = $("serialTarget").value;
+        if (!prefix) return line;
+        const head = line.trimStart();
+        if (/^[sS]\d+:/.test(head)) return line;
+        if (head.startsWith(":")) return prefix + head;
+        return prefix + line;
+      }
+
+      function pad4(n) {
+        const v = Math.max(0, Math.min(9999, Math.round(Number(n))));
+        return String(v).padStart(4, "0");
+      }
+
+      async function sendOneLine(cmd) {
+        if (!writer) return;
+        const withRoute = applySerialPrefix(cmd);
+        const payload = withRoute + lineEnding();
+        await writer.write(payload);
+        appendLog("→ ", JSON.stringify(payload));
+      }
+
+      async function sendCommand() {
+        if (!writer) return;
+        autoSelectRouteFromCmdInput();
+        const raw = $("cmd").value;
+        const lines = raw.split(/\r?\n/);
+        try {
+          for (const line of lines) {
+            const trimmed = line;
+            if (trimmed.length === 0 && lines.length > 1) continue;
+            await sendOneLine(trimmed);
+          }
+        } catch (e) {
+          appendLog("! ", L("logSendErr") + (e.message || e));
+          statusEl.textContent = L("statusErrorSend");
+          statusEl.classList.add("error");
+        }
+      }
+
+      function looksLikeMdCommand(line) {
+        const raw = String(line || "").trim();
+        if (!raw) return false;
+        if (/^md:/i.test(raw)) return true;
+        return /^[:*#@!$%]/.test(raw);
+      }
+
+      function autoSelectRouteFromCmdInput() {
+        const raw = $("cmd").value || "";
+        const lines = raw.split(/\r?\n/).map((s) => s.trim()).filter(Boolean);
+        if (!lines.length) return;
+        if (lines.some(looksLikeMdCommand)) {
+          $("serialTarget").value = "";
+        }
+      }
+
+      function getPwmRange() {
+        let mn = parseInt($("pwmMin").value, 10);
+        let mx = parseInt($("pwmMax").value, 10);
+        if (Number.isNaN(mn)) mn = 800;
+        if (Number.isNaN(mx)) mx = 2200;
+        if (mx <= mn) mx = mn + 100;
+        return { mn, mx };
+      }
+
+      function syncSliderLimits() {
+        const { mn, mx } = getPwmRange();
+        ["sliderH", "sliderV"].forEach((id) => {
+          const s = $(id);
+          s.min = String(mn);
+          s.max = String(mx);
+          let v = parseInt(s.value, 10);
+          if (v < mn) v = mn;
+          if (v > mx) v = mx;
+          s.value = String(v);
+        });
+        updateSliderLabels();
+      }
+
+      function updateSliderLabels() {
+        $("valH").textContent = $("sliderH").value;
+        $("valV").textContent = $("sliderV").value;
+      }
+
+      /** xx = holo 01–03, dddd = grado o µs (BetterDuino README, mismo criterio que paneles). */
+      function normalizeHoloId2(holoId) {
+        return String(holoId || "01").replace(/\D/g, "").padStart(2, "0").slice(-2);
+      }
+
+      function buildHoloCommands(mode, holoId, hVal, vVal, saveAxis) {
+        const id2 = normalizeHoloId2(holoId);
+        const h4 = pad4(hVal);
+        const v4 = pad4(vVal);
+        if (mode === "test") return ["*MH" + id2 + h4, "*MV" + id2 + v4];
+        if (mode === "eeprom_open") {
+          if (saveAxis === "h") return ["#HO" + id2 + h4];
+          if (saveAxis === "v") return ["#VO" + id2 + v4];
+          return ["#HO" + id2 + h4, "#VO" + id2 + v4];
+        }
+        if (mode === "eeprom_closed") {
+          if (saveAxis === "h") return ["#HC" + id2 + h4];
+          if (saveAxis === "v") return ["#VC" + id2 + v4];
+          return ["#HC" + id2 + h4, "#VC" + id2 + v4];
+        }
+        return [];
+      }
+
+      /** BetterDuino: *CH00 = todos; *CH01–*CH03 = holo N (2 dígitos). */
+      function buildHoloCenterCommand(holoId) {
+        return "*CH" + normalizeHoloId2(holoId);
+      }
+
+      /** Número de panel Marcduino xx en :MV/:OP/:CL/#SO/#SC (01–13 body/dome; ver mdPanel en cada zona). */
+      function getMdPanel2(zone) {
+        if (!zone) return "01";
+        if (zone.mdPanel != null && zone.mdPanel !== "") {
+          return String(zone.mdPanel).replace(/\D/g, "").padStart(2, "0").slice(-2);
+        }
+        const si = Math.max(0, Math.min(12, Math.round(Number(zone.servoIndex))));
+        return String(si + 1).padStart(2, "0");
+      }
+
+      function buildDomePanelMove(panel2, pwm) {
+        const p2 = String(panel2 || "01").padStart(2, "0").slice(-2);
+        return ":MV" + p2 + pad4(pwm);
+      }
+
+      function buildDomeOpen(panel2) {
+        const p2 = String(panel2 || "01").padStart(2, "0").slice(-2);
+        return ":OP" + p2;
+      }
+
+      function buildDomeClose(panel2) {
+        const p2 = String(panel2 || "01").padStart(2, "0").slice(-2);
+        return ":CL" + p2;
+      }
+
+      /** EEPROM panel: #SOxx / #SCxx (mismo xx que :MV). */
+      function buildPanelEepromCommand(mode, panel2, pwm) {
+        const p2 = String(panel2 || "01").padStart(2, "0").slice(-2);
+        const p4 = pad4(pwm);
+        if (mode === "eeprom_open") return "#SO" + p2 + p4;
+        if (mode === "eeprom_closed") return "#SC" + p2 + p4;
+        return "";
+      }
+
+      function getCenterPwm() {
+        const { mn, mx } = getPwmRange();
+        return Math.round((mn + mx) / 2);
+      }
+
+      /**
+       * @param {string} mode test | eeprom_open | eeprom_closed
+       * @param {number} [hOverride] si se omite, usa slider H
+       * @param {number} [vOverride] si se omite, usa slider V
+       */
+      async function sendBlueprintWithMode(mode, hOverride, vOverride) {
+        if (!writer) return;
+        const z = getCurrentZone();
+        if (!z) return;
+        const h =
+          hOverride !== undefined && hOverride !== null
+            ? Math.round(Number(hOverride))
+            : parseInt($("sliderH").value, 10);
+        const v =
+          vOverride !== undefined && vOverride !== null
+            ? Math.round(Number(vOverride))
+            : parseInt($("sliderV").value, 10);
+
+        if (z.kind === "servo") {
+          const panel2 = getMdPanel2(z);
+          const cmd =
+            mode === "test"
+              ? buildDomePanelMove(panel2, h)
+              : buildPanelEepromCommand(mode, panel2, h);
+          if (!cmd) return;
+          try {
+            await sendOneLine(cmd);
+          } catch (e) {
+            appendLog("! ", L("blueprintErr") + (e.message || e));
+            statusEl.textContent = L("statusErrorSend");
+            statusEl.classList.add("error");
+          }
+          return;
+        }
+
+        const saveAxis = $("holoSaveAxis").value || "hv";
+        const cmds = buildHoloCommands(mode, z.holoId, h, v, saveAxis);
+        if (cmds.length === 0) return;
+        try {
+          for (const c of cmds) await sendOneLine(c);
+        } catch (e) {
+          appendLog("! ", L("blueprintErr") + (e.message || e));
+          statusEl.textContent = L("statusErrorSend");
+          statusEl.classList.add("error");
+        }
+      }
+
+      async function sendBlueprintPosition() {
+        const z = getCurrentZone();
+        if (!z) return;
+        if (z.kind === "servo") {
+          await sendBlueprintWithMode("test");
+          return;
+        }
+        // Holo: siempre *MH/*MV en vivo (nunca EEPROM al mover slider / Enviar).
+        await sendBlueprintWithMode("test");
+      }
+
+      async function centerServos() {
+        const z = getCurrentZone();
+        if (z && z.kind === "holo") {
+          try {
+            await sendOneLine(buildHoloCenterCommand(z.holoId));
+          } catch (e) {
+            appendLog("! ", L("centerHoloErr") + (e.message || e));
+          }
+          const c = getCenterPwm();
+          $("sliderH").value = String(c);
+          $("sliderV").value = String(c);
+          updateSliderLabels();
+          return;
+        }
+        const c = getCenterPwm();
+        $("sliderH").value = String(c);
+        updateSliderLabels();
+        if (z && z.kind === "servo") await sendBlueprintWithMode("test", c, null);
+      }
+
+      async function centerAllHolos() {
+        try {
+          await sendOneLine("*CH00");
+        } catch (e) {
+          appendLog("! ", L("ch00Err") + (e.message || e));
+        }
+      }
+
+      async function sendZoneOpenOrClose(openNotClose) {
+        if (!writer) return;
+        const z = getCurrentZone();
+        if (!z || z.kind !== "servo") return;
+        try {
+          const p2 = getMdPanel2(z);
+          const cmd = openNotClose ? buildDomeOpen(p2) : buildDomeClose(p2);
+          await sendOneLine(cmd);
+        } catch (e) {
+          appendLog("! ", L("openCloseErr") + (e.message || e));
+        }
+      }
+
+      function scheduleAutoSend() {
+        if (!$("autoSend").checked || !writer) return;
+        clearTimeout(autoSendTimer);
+        autoSendTimer = setTimeout(() => {
+          sendBlueprintPosition();
+        }, 120);
+      }
+
+      function selectZone(index) {
+        if (index < 0) index = R2_BLUEPRINT_ZONES.length - 1;
+        if (index >= R2_BLUEPRINT_ZONES.length) index = 0;
+        selectedZoneIndex = index;
+        $("zoneSelect").value = String(index);
+        const z = getCurrentZone();
+        const inferredTarget = z && z.target ? z.target : inferSerialTargetFromZone(z);
+        if (inferredTarget) $("serialTarget").value = inferredTarget;
+        document.querySelectorAll(".hotspot").forEach((el) => {
+          const zi = parseInt(el.getAttribute("data-zone-index"), 10);
+          el.classList.toggle("selected", zi === index);
+        });
+        updateZoneUi();
+      }
+
+      function getZoneIndexByClick(xPct, yPct) {
+        let best = -1;
+        let bestDist2 = Infinity;
+        R2_BLUEPRINT_ZONES.forEach((z, i) => {
+          const maps = getZoneMaps(z);
+          maps.forEach((m) => {
+            const cx = m.left + m.w / 2;
+            const cy = m.top + m.h / 2;
+            const dx = xPct - cx;
+            const dy = yPct - cy;
+            const dist2 = dx * dx + dy * dy;
+            if (dist2 < bestDist2) {
+              bestDist2 = dist2;
+              best = i;
+            }
+          });
+        });
+
+        return best;
+      }
+
+      function fillZoneSelect() {
+        const sel = $("zoneSelect");
+        sel.innerHTML = "";
+        R2_BLUEPRINT_ZONES.forEach((z, i) => {
+          const o = document.createElement("option");
+          o.value = String(i);
+          o.textContent = zoneDisplayLabel(z);
+          sel.appendChild(o);
+        });
+      }
+
+      function renderHotspots() {
+        const box = $("hotspots");
+        box.innerHTML = "";
+        R2_BLUEPRINT_ZONES.forEach((z, i) => {
+          const maps = getZoneMaps(z);
+          maps.forEach((m) => {
+            const d = document.createElement("button");
+            d.type = "button";
+            d.className = "hotspot" + (i === selectedZoneIndex ? " selected" : "");
+            d.setAttribute("data-zone-index", String(i));
+            d.style.left = m.left + "%";
+            d.style.top = m.top + "%";
+            d.style.width = m.w + "%";
+            d.style.height = m.h + "%";
+            const zlab = zoneDisplayLabel(z);
+            d.setAttribute("aria-label", zlab);
+            const lab = document.createElement("span");
+            lab.className = "hotspot-label";
+            lab.textContent = zlab;
+            d.appendChild(lab);
+            d.addEventListener("click", () => {
+              selectZone(i);
+            });
+            box.appendChild(d);
+          });
+        });
+      }
+
+      $("zoneSelect").addEventListener("change", () => {
+        selectZone(parseInt($("zoneSelect").value, 10) || 0);
+      });
+      $("zonePrev").addEventListener("click", () => selectZone(selectedZoneIndex - 1));
+      $("zoneNext").addEventListener("click", () => selectZone(selectedZoneIndex + 1));
+      $("pwmMin").addEventListener("change", syncSliderLimits);
+      $("pwmMax").addEventListener("change", syncSliderLimits);
+      $("blueprintStage").addEventListener("click", (e) => {
+        // Si el usuario clicó justo sobre un hotspot, déjalo que lo gestione su propio handler.
+        if (e.target && e.target.closest && e.target.closest(".hotspot")) return;
+
+        const stage = $("blueprintStage");
+        const rect = stage.getBoundingClientRect();
+        const xPx = e.clientX - rect.left;
+        const yPx = e.clientY - rect.top;
+        const xPct = (xPx / rect.width) * 100;
+        const yPct = (yPx / rect.height) * 100;
+
+        // Modo calibración manual (batch): log con zona seleccionada + coords.
+        const current = getCurrentZone();
+        const zoneLabel = current ? zoneDisplayLabel(current) : L("mapLogNoZone");
+        const zoneKey = current
+          ? (current.kind === "holo" ? "holo:" + current.holoId : "servo:" + current.servoIndex)
+          : "none";
+        const line =
+          "[map] " +
+          zoneLabel +
+          " [" +
+          zoneKey +
+          "] => left=" +
+          xPct.toFixed(2) +
+          ", top=" +
+          yPct.toFixed(2);
+        console.log(line);
+        window.__mapLogs = window.__mapLogs || [];
+        window.__mapLogs.push(line);
+
+        const zi = getZoneIndexByClick(xPct, yPct);
+        if (zi >= 0) selectZone(zi);
+      });
+      $("sliderH").addEventListener("input", () => {
+        updateSliderLabels();
+        scheduleAutoSend();
+      });
+      $("sliderV").addEventListener("input", () => {
+        updateSliderLabels();
+        scheduleAutoSend();
+      });
+      $("btnSendPos").addEventListener("click", () => sendBlueprintPosition());
+      $("btnCenterServos").addEventListener("click", () => centerServos());
+      $("btnPanelOpen").addEventListener("click", () => sendZoneOpenOrClose(true));
+      $("btnPanelClose").addEventListener("click", () => sendZoneOpenOrClose(false));
+      $("btnCenterAllHolos").addEventListener("click", () => centerAllHolos());
+      $("btnSaveOpen").addEventListener("click", () => sendBlueprintWithMode("eeprom_open"));
+      $("btnSaveClosed").addEventListener("click", () => sendBlueprintWithMode("eeprom_closed"));
+
+      syncSliderLimits();
+
+      $("uiLang").addEventListener("change", () => {
+        uiLang = $("uiLang").value === "es" ? "es" : "en";
+        localStorage.setItem(LANG_KEY, uiLang);
+        applyUiLanguage();
+      });
+
+      $("btnConnect").addEventListener("click", openPort);
+      $("btnDisconnect").addEventListener("click", closePort);
+      $("btnSend").addEventListener("click", sendCommand);
+      $("cmd").addEventListener("input", autoSelectRouteFromCmdInput);
+      $("btnClearLog").addEventListener("click", () => {
+        logEl.textContent = "";
+      });
+    })();
+  </script>
+</body>
+</html>
