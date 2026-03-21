@@ -4,5 +4,12 @@ FORO-ShadowMDLite-comunidad.md
 # Word local (no subir)
 Post.docx
 
+# Borradores y material solo para foro (no subir)
+post/
+
+# Temporales al extraer .docx (no subir)
+_post_docx_extract/
+_post_temp.zip
+
 # Bloqueo temporal de Office (no subir)
 ~$*
