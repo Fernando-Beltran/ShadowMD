@@ -539,6 +539,10 @@
 
     (function () {
       const LANG_KEY = "shadowmd-lite-ui-lang";
+      /** PWM min/max por zona (servo/holo); cookie + localStorage de respaldo (p. ej. file://). */
+      const PWM_RANGE_COOKIE = "shadowmd_pwm_ranges";
+      const PWM_RANGE_LS = "shadowmd_pwm_ranges_json";
+      const PWM_COOKIE_MAX_AGE_SEC = 365 * 24 * 60 * 60;
       const STR =
         window.SHADOWMD_LITE_I18N &&
         window.SHADOWMD_LITE_I18N.en &&
@@ -877,6 +881,64 @@
         return { mn, mx };
       }
 
+      function readPwmRangesMap() {
+        try {
+          const part = document.cookie.split("; ").find((row) => row.startsWith(PWM_RANGE_COOKIE + "="));
+          if (part) {
+            const enc = part.slice(PWM_RANGE_COOKIE.length + 1);
+            const o = JSON.parse(decodeURIComponent(enc));
+            if (o && typeof o === "object") return o;
+          }
+        } catch (_) {}
+        try {
+          const json = localStorage.getItem(PWM_RANGE_LS);
+          if (json) {
+            const o = JSON.parse(json);
+            if (o && typeof o === "object") return o;
+          }
+        } catch (_) {}
+        return {};
+      }
+
+      function writePwmRangesMap(map) {
+        const json = JSON.stringify(map);
+        try {
+          document.cookie =
+            PWM_RANGE_COOKIE +
+            "=" +
+            encodeURIComponent(json) +
+            ";path=/;max-age=" +
+            PWM_COOKIE_MAX_AGE_SEC +
+            ";SameSite=Lax";
+        } catch (_) {}
+        try {
+          localStorage.setItem(PWM_RANGE_LS, json);
+        } catch (_) {}
+      }
+
+      function persistPwmRangeForZoneFromInputs(zone) {
+        if (!zone || !zone.id) return;
+        const { mn, mx } = getPwmRange();
+        const map = readPwmRangesMap();
+        map[zone.id] = { min: mn, max: mx };
+        writePwmRangesMap(map);
+      }
+
+      function applyStoredPwmRangeForZone(zone) {
+        if (!zone || !zone.id) return;
+        const e = readPwmRangesMap()[zone.id];
+        if (!e) return;
+        let mn = parseInt(e.min, 10);
+        let mx = parseInt(e.max, 10);
+        if (Number.isNaN(mn) || Number.isNaN(mx)) return;
+        mn = Math.max(0, Math.min(4095, mn));
+        mx = Math.max(0, Math.min(4095, mx));
+        if (mx <= mn) mx = mn + 100;
+        $("pwmMin").value = String(mn);
+        $("pwmMax").value = String(mx);
+        syncSliderLimits();
+      }
+
       function syncSliderLimits() {
         const { mn, mx } = getPwmRange();
         ["sliderH", "sliderV"].forEach((id) => {
@@ -990,6 +1052,9 @@
           if (!cmd) return;
           try {
             await sendOneLine(cmd);
+            if (mode === "eeprom_open" || mode === "eeprom_closed") {
+              persistPwmRangeForZoneFromInputs(z);
+            }
           } catch (e) {
             appendLog("! ", L("blueprintErr") + (e.message || e));
             statusEl.textContent = L("statusErrorSend");
@@ -1003,6 +1068,9 @@
         if (cmds.length === 0) return;
         try {
           for (const c of cmds) await sendOneLine(c);
+          if (mode === "eeprom_open" || mode === "eeprom_closed") {
+            persistPwmRangeForZoneFromInputs(z);
+          }
         } catch (e) {
           appendLog("! ", L("blueprintErr") + (e.message || e));
           statusEl.textContent = L("statusErrorSend");
@@ -1073,6 +1141,10 @@
       function selectZone(index) {
         if (index < 0) index = R2_BLUEPRINT_ZONES.length - 1;
         if (index >= R2_BLUEPRINT_ZONES.length) index = 0;
+        if (index !== selectedZoneIndex) {
+          const prev = getCurrentZone();
+          if (prev && prev.id) persistPwmRangeForZoneFromInputs(prev);
+        }
         selectedZoneIndex = index;
         $("zoneSelect").value = String(index);
         const z = getCurrentZone();
@@ -1082,6 +1154,7 @@
           const zi = parseInt(el.getAttribute("data-zone-index"), 10);
           el.classList.toggle("selected", zi === index);
         });
+        applyStoredPwmRangeForZone(z);
         updateZoneUi();
       }
 
@@ -1150,8 +1223,13 @@
       });
       $("zonePrev").addEventListener("click", () => selectZone(selectedZoneIndex - 1));
       $("zoneNext").addEventListener("click", () => selectZone(selectedZoneIndex + 1));
-      $("pwmMin").addEventListener("change", syncSliderLimits);
-      $("pwmMax").addEventListener("change", syncSliderLimits);
+      function onPwmRangeFieldChange() {
+        syncSliderLimits();
+        const z = getCurrentZone();
+        if (z && z.id) persistPwmRangeForZoneFromInputs(z);
+      }
+      $("pwmMin").addEventListener("change", onPwmRangeFieldChange);
+      $("pwmMax").addEventListener("change", onPwmRangeFieldChange);
       $("blueprintStage").addEventListener("click", (e) => {
         // Si el usuario clicó justo sobre un hotspot, déjalo que lo gestione su propio handler.
         if (e.target && e.target.closest && e.target.closest(".hotspot")) return;
