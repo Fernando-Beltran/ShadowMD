@@ -1477,28 +1477,22 @@ void marcDuinoButtonPush(int type, int MD_func)
       // 12 = Full Awake mode reset (panel close, rnd sound, holo move,holo lights off)
       case 12:
         Serial1.print(":SE11\r");
-        sendSerial1("*HPF0000\r");
-        sendSerial1("*HPT0000\r");
-        sendSerial1("*HPR0000\r");
-
+        sendSerial1("*HPA0000\r");
+        
         break;
                 
       // 13 = Mid Awake mode reset (panel close, rnd sound, stop holos)
       case 13:
         Serial1.print(":SE13\r");
-        sendSerial1("*HPF0000\r");
-        sendSerial1("*HPT0000\r");
-        sendSerial1("*HPR0000\r");
+        sendSerial1("*HPA0000\r");
         break;
                 
       // 14 = Full Awake+ reset (panel close, rnd sound, holo move, holo lights on)
       case 14:
 
         Serial1.print(":SE14\r");
-        sendSerial1("*HPF001\r");
-        sendSerial1("*HPT001\r");
-        sendSerial1("*HPR001\r");
-
+        sendSerial1("*HPA001\r");
+        
         break;
                 
       // 15 = Scream, with all panels open (NO SOUND)
