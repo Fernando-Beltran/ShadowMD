@@ -108,10 +108,8 @@ int CustomSongMax = 8; //Total Number of Custom Songs
 
 // PC -> MarcDuino forwarding por USB/Serial (opcional).
 // Comandos (una línea por comando):
-//   S1:<COMANDO>  -> reenvía a Serial1 (dome Marcduino)
-//   S3:<COMANDO>  -> reenvía a Serial3 (body Marcduino)
-//   HELP | PING | MD:<0-89>  -> solo Mega (USB), no reenvío
-//   DT:<lo mismo>  -> explícito “directo al Mega” (HELP/PING/MD); *:#:@: etc. van con S1:/S3:
+//   S1:<COMANDO>  -> reenvía a Serial1
+//   S3:<COMANDO>  -> reenvía a Serial3
 // Ejemplo: S1::SE01  (la app/monitor serie puede enviar \n; el firmware añade \r automáticamente)
 #define ENABLE_PC_TO_MARCDUINO_FORWARDING 1
 
@@ -315,7 +313,7 @@ int footBtnRightL1_MD_func = 5; // 5 = Wave 2, Open progressively all panels, th
 //---------------------------------
 // CONFIGURE: Arrow Down + L1
 //---------------------------------
-int footBtnDownL1_MD_func = 0; //0 = FREE
+int footBtnDownL1_MD_func = 20; //0 = FREE
 
 //---------------------------------
 // CONFIGURE: Arrow Up + L3 (Foot arrow + Dome L3, cross-controller)
@@ -505,7 +503,7 @@ int domeBtnRightL2Circle_MD_func = 0; // 0 = FREE
 //---------------------------------
 // CONFIGURE: Arrow Up + L3 (Dome arrow + Foot L3, cross-controller)
 //---------------------------------
-int domeBtnUpL3_MD_func = 0; // 0 = FREE
+int domeBtnUpL3_MD_func = 90; // 0 = FREE
 
 //---------------------------------
 // CONFIGURE: Arrow Down + L3 (Dome arrow + Foot L3, cross-controller)
@@ -754,73 +752,6 @@ static inline void pcTrimRight(char* s)
   }
 }
 
-static void printPCSerialHelp()
-{
-  Serial.println(F("ShadowMD PC Serial forwarding ON"));
-  Serial.println(F("Marcduino: S1:<cmd> (dome) or S3:<cmd> (body). Ex: S1::SE01"));
-  Serial.println(F("Local Mega: HELP | PING | MD:<0-89> (same as PS3 Marcduino map)"));
-  Serial.println(F("Optional prefix DT: = local only, no Serial1/3. Ex: DT:HELP  DT:MD:14"));
-}
-
-/** HELP / PING / MD: — handled on USB Serial only (not forwarded to Marcduino UARTs). */
-static bool processPCLocalMegaCommand(const char* p)
-{
-  if (!strcmp(p, "HELP") || !strcmp(p, "help"))
-  {
-    printPCSerialHelp();
-    return true;
-  }
-
-  if (!strcmp(p, "PING") || !strcmp(p, "ping"))
-  {
-    Serial.println(F("PONG"));
-    return true;
-  }
-
-  if ((p[0] == 'M' || p[0] == 'm') && (p[1] == 'D' || p[1] == 'd') && p[2] == ':')
-  {
-    const char* payload = p + 3;
-    while (*payload == ' ' || *payload == '\t') payload++;
-    if (*payload == '\0')
-    {
-      Serial.println(F("ERR Missing mdFunc"));
-      return true;
-    }
-
-    char* endPtr = NULL;
-    long mdFunc = strtol(payload, &endPtr, 10);
-    if (endPtr == payload)
-    {
-      Serial.println(F("ERR Invalid mdFunc"));
-      return true;
-    }
-
-    if (mdFunc < 0 || mdFunc > 89)
-    {
-      Serial.println(F("ERR mdFunc out of range (0-89)"));
-      return true;
-    }
-
-    while (*endPtr == ' ' || *endPtr == '\t') endPtr++;
-    if (*endPtr != '\0')
-    {
-      Serial.println(F("ERR Unexpected characters after mdFunc"));
-      return true;
-    }
-
-    while (Serial1.available()) Serial1.read();
-    while (Serial3.available()) Serial3.read();
-
-    marcDuinoButtonPush(1, (int)mdFunc);
-    Serial.print(F("OK marcDuinoButtonPush(1, "));
-    Serial.print(mdFunc);
-    Serial.println(F(")"));
-    return true;
-  }
-
-  return false;
-}
-
 static void processPCSerialLine(const char* line)
 {
   // Make a mutable copy for trimming.
@@ -835,26 +766,63 @@ static void processPCSerialLine(const char* line)
 
   if (*p == '\0') return;
 
-  if (processPCLocalMegaCommand(p))
-    return;
-
-  // DT:<inner> — explicit "direct to Mega" (same local set as above, never forwarded).
-  if ((p[0] == 'D' || p[0] == 'd') && (p[1] == 'T' || p[1] == 't') && p[2] == ':')
+  // Lightweight commands for validation.
+  if (!strcmp(p, "HELP") || !strcmp(p, "help"))
   {
-    const char* inner = p + 3;
-    while (*inner == ' ' || *inner == '\t') inner++;
-    if (*inner == '\0')
+    Serial.println(F("ShadowMD PC Serial forwarding ON"));
+    Serial.println(F("Use: S1:<COMANDO> or S3:<COMANDO>"));
+    Serial.println(F("Also: MD:<mdFunc> (calls marcDuinoButtonPush(1, mdFunc))"));
+    Serial.println(F("Example: S1::SE01"));
+    return;
+  }
+
+  if (!strcmp(p, "PING") || !strcmp(p, "ping"))
+  {
+    Serial.println(F("PONG"));
+    return;
+  }
+
+  // High-level command: MD:<mdFunc>
+  if ((p[0] == 'M' || p[0] == 'm') && (p[1] == 'D' || p[1] == 'd') && p[2] == ':')
+  {
+    const char* payload = p + 3;
+    while (*payload == ' ' || *payload == '\t') payload++;
+    if (*payload == '\0')
     {
-      Serial.println(F("ERR Empty DT: payload"));
+      Serial.println(F("ERR Missing mdFunc"));
       return;
     }
-    char innerBuf[160];
-    strncpy(innerBuf, inner, sizeof(innerBuf) - 1);
-    innerBuf[sizeof(innerBuf) - 1] = '\0';
-    pcTrimRight(innerBuf);
-    if (processPCLocalMegaCommand(innerBuf))
+
+    char* endPtr = NULL;
+    long mdFunc = strtol(payload, &endPtr, 10);
+    if (endPtr == payload)
+    {
+      Serial.println(F("ERR Invalid mdFunc"));
       return;
-    Serial.println(F("ERR DT: solo HELP, PING o MD:<0-89>. Marcduino: S1: o S3: (ej. S1:*ON00)"));
+    }
+
+    if (mdFunc < 0 || mdFunc > 99)
+    {
+      Serial.println(F("ERR mdFunc out of range (0-89)"));
+      return;
+    }
+
+    // Allow trailing spaces (already trimmed-right, but be defensive).
+    while (*endPtr == ' ' || *endPtr == '\t') endPtr++;
+    if (*endPtr != '\0')
+    {
+      Serial.println(F("ERR Unexpected characters after mdFunc"));
+      return;
+    }
+
+    // Keep MarcDuino Serial RX buffers clear right before sending actions.
+    while (Serial1.available()) Serial1.read();
+    while (Serial3.available()) Serial3.read();
+
+    marcDuinoButtonPush(1, (int)mdFunc);
+    Serial.print(F("OK marcDuinoButtonPush(1, "));
+    Serial.print(mdFunc);
+    Serial.println(F(")"));
     return;
   }
 
@@ -907,7 +875,7 @@ static void processPCSerialLine(const char* line)
     return;
   }
 
-  Serial.println(F("ERR formato. Marcduino: S1: o S3:. Mega local: HELP, PING, MD:<n>, DT:... Ej: S1::SE01"));
+  Serial.println(F("ERR formato. Use S1:<COMANDO> o S3:<COMANDO>. Ej: S1::SE01"));
 }
 
 static void processPCSerial()
@@ -1430,8 +1398,8 @@ void marcDuinoButtonPush(int type, int MD_func)
 
       // 2 = Scream - all panels open
       case 2:
-        Serial1.print(":SE01\r");
-        Serial1.print("*HPA0051\r");  
+        Serial1.print(":SE01\r");        
+        Serial1.print("*HPA0051\r");         
         sendSerial1("@0P2\r");  
      
         break;
@@ -1485,9 +1453,9 @@ void marcDuinoButtonPush(int type, int MD_func)
         #ifdef SHADOW_VERBOSE
           output += "MD 9: sending Leia sequence (:SE08) + holo (*HPF001) on Serial1\r\n";
         #endif
-        sendSerial1(":SE08\r");
-         delay(5);
+        sendSerial1(":SE08\r");        
         sendSerial1("*HPF001\r");
+        sendSerial1("*MV012100\r");
         break;
                 
       // 10 = Disco
@@ -1498,33 +1466,42 @@ void marcDuinoButtonPush(int type, int MD_func)
       // 11 = Quite mode reset (panel close, stop holos, stop sounds)
       case 11:
         sendSerial1("@0T1\r");
-        sendSerial1(":SE10\r");
-        sendSerial1("*HPA0000\r");
-         delay(5);
-       sendSerial1("*APLE4231000\r");  
-         delay(5);
-       sendSerial1("*APLE5233000\r");
+        sendSerial1(":SE11\r");
+        sendSerial1("*HPT0000\r");         
+        sendSerial1("*HPR0000\r");         
+        sendSerial1("*HPF0000\r");         
+        sendSerial1("*APLE4231000\r");
+        sendSerial1("*APLE5233000\r");
         break;
                 
       // 12 = Full Awake mode reset (panel close, rnd sound, holo move,holo lights off)
       case 12:
-        Serial1.print(":SE11\r");
-        sendSerial1("*HPA0000\r");
-        
+        Serial1.print(":SE11\r");        
+        sendSerial1("*HPF0000\r");
+        sendSerial1("*HPT0000\r");
+        sendSerial1("*HPR0000\r");
+
         break;
                 
       // 13 = Mid Awake mode reset (panel close, rnd sound, stop holos)
       case 13:
-        Serial1.print(":SE13\r");
-        sendSerial1("*HPA0000\r");
+        Serial1.print(":SE13\r");        
+        sendSerial1("*HPF0000\r");       
+        sendSerial1("*HPT0000\r");        
+        sendSerial1("*HPR0000\r");        
         break;
                 
       // 14 = Full Awake+ reset (panel close, rnd sound, holo move, holo lights on)
       case 14:
 
         Serial1.print(":SE14\r");
-        sendSerial1("*HPA001\r");
-        
+        delay(15);
+        sendSerial1("*HPF001\r");
+        delay(15);
+        sendSerial1("*HPT001\r");
+        delay(15);
+        sendSerial1("*HPR001\r");
+
         break;
                 
       // 15 = Scream, with all panels open (NO SOUND)
@@ -1554,11 +1531,12 @@ void marcDuinoButtonPush(int type, int MD_func)
                 
       // 20 = Faint/Short Circuit (NO SOUND)
       case 20:
-        Serial1.print(":SE56\r");
+        Serial1.print("$176\r");
         break;
                 
       // 21 = Rhythmic cantina dance (NO SOUND)
       case 21:
+        //Serial1.print(":SE57\r");
         Serial1.print(":SE57\r");
         break;
                 
@@ -2003,6 +1981,11 @@ void marcDuinoButtonPush(int type, int MD_func)
 //        }  else {
 //            Serial1.print(MakeSongCommand(CurrentSongNum));//Play Newly selected song
 //        }
+        break;
+
+        // 90 Arrow Up + L3 (Dome arrow + Foot L3, cross-controller)
+        case 90:
+          Serial1.print("$R\r");
         break;
     }
       //Eebel code end
