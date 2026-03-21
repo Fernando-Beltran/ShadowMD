@@ -11,5 +11,8 @@ post/
 _post_docx_extract/
 _post_temp.zip
 
+# Descarga HTML ForoCoches (scraping local, no subir)
+_fc_thread.html
+
 # Bloqueo temporal de Office (no subir)
 ~$*
